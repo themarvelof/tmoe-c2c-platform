@@ -1129,6 +1129,197 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+@app.on_event("startup")
+async def startup_seed():
+    """Seed essential data on startup if not already present."""
+    try:
+        # 1. Seed Admin
+        if not await db.users.find_one({"email": "admin@tmoe.com"}):
+            admin_user = User(
+                email="admin@tmoe.com",
+                password_hash=pwd_context.hash("Admin@123"),
+                role=UserRole.ADMIN,
+                status=UserStatus.APPROVED,
+                company_name="TMOE Operations"
+            )
+            await db.users.insert_one(admin_user.model_dump())
+            logger.info("Seeded admin user")
+
+        # 2. Seed Publisher (abhishek@marvelof.com)
+        pub_doc = await db.users.find_one({"email": "abhishek@marvelof.com"}, {"_id": 0})
+        if not pub_doc:
+            pub_user = User(
+                email="abhishek@marvelof.com",
+                password_hash=pwd_context.hash("Publisher@123"),
+                role=UserRole.PUBLISHER,
+                status=UserStatus.APPROVED,
+                company_name="Marvel of Everything",
+                website="https://marvelof.com"
+            )
+            await db.users.insert_one(pub_user.model_dump())
+            pub_doc = pub_user.model_dump()
+            logger.info("Seeded publisher abhishek@marvelof.com")
+
+        pub_id = pub_doc["id"]
+
+        # 3. Seed Publisher Profile
+        if not await db.publisher_profiles.find_one({"user_id": pub_id}):
+            profile = PublisherProfile(
+                user_id=pub_id,
+                name="Marvel of Everything",
+                website="https://marvelof.com",
+                logo_url="https://images.assettype.com/marvelof/2025-11-06/t2lv7eab/MarvelofLogo256x256.png?w=50&fm=png",
+                categories=["Technology", "Fashion", "Food", "Home & Living"],
+                description="Your Go-To Guide for Informed Decisions across tech, fashion, lifestyle & food.",
+                monthly_sessions=500000,
+                monthly_pageviews=2000000,
+                rss_feed_url="https://marvelof.com/feed"
+            )
+            await db.publisher_profiles.insert_one(profile.model_dump())
+            logger.info("Seeded publisher profile for Marvel of Everything")
+
+        # 4. Seed Brand (amazontmoe@marvelof.com)
+        brand_doc = await db.users.find_one({"email": "amazontmoe@marvelof.com"}, {"_id": 0})
+        if not brand_doc:
+            brand_user = User(
+                email="amazontmoe@marvelof.com",
+                password_hash=pwd_context.hash("Amazon@123"),
+                role=UserRole.BRAND,
+                status=UserStatus.APPROVED,
+                company_name="Amazon TMOE",
+                website="https://amazon.in"
+            )
+            await db.users.insert_one(brand_user.model_dump())
+            brand_doc = brand_user.model_dump()
+            logger.info("Seeded brand amazontmoe@marvelof.com")
+
+        brand_id = brand_doc["id"]
+
+        # 5. Seed Campaign linking brand and publisher
+        if not await db.campaigns.find_one({"assigned_brand": brand_id, "assigned_publishers": pub_id}):
+            campaign = Campaign(
+                name="Amazon TMOE x Marvel of Everything",
+                category="Technology",
+                target_markets=["India"],
+                assigned_publishers=[pub_id],
+                assigned_brand=brand_id,
+                content_type="Product Reviews & Guides",
+                content_budget=25000.0,
+                distribution_budget=25000.0,
+                commerce_links=["https://amazon.in"],
+                status=CampaignStatus.ACTIVE,
+                start_date="2026-03-01",
+                end_date="2026-06-30"
+            )
+            await db.campaigns.insert_one(campaign.model_dump())
+            logger.info("Seeded campaign: Amazon TMOE x Marvel of Everything")
+
+        # 6. Seed Amazon-related articles from marvelof.com
+        existing_count = await db.content_pieces.count_documents({"brand_id": brand_id, "publisher_id": pub_id})
+        if existing_count == 0:
+            articles = [
+                ContentPiece(
+                    title="Smart TV To Surround Sound System: 5 Essential Items For The Ultimate Home Theatre Experience",
+                    url="https://marvelof.com/gadgets/smart-tv-to-surround-sound-system-5-essential-items-for-the-ultimate-home-theatre-experience",
+                    publisher_id=pub_id, brand_id=brand_id,
+                    published_date="2026-04-06T05:45:00+00:00",
+                    image_url="https://media.assettype.com/marvelof%2F2026-04-02%2Fplg3h9t4%2FUntitled-design-2026-04-02T101439.931.jpg?w=480&auto=format%2Ccompress&fit=max",
+                    source="marvelof.com", author="Puja Menon",
+                    description="From a high-quality display to immersive sound systems, here are five must-have items to set up a perfect home theatre experience."
+                ),
+                ContentPiece(
+                    title="OPPO F33 Pro 5G Key Details Leaked: Here's Everything You Need to Know",
+                    url="https://marvelof.com/gadgets/oppo-f33-pro-5g-india-launch-date-price-range-specs-leaked-online",
+                    publisher_id=pub_id, brand_id=brand_id,
+                    published_date="2026-04-06T04:30:00+00:00",
+                    image_url="https://media.assettype.com/marvelof%2F2026-04-06%2Fhewalr06%2FOPPO-F33-Pro-5G.jpg?w=480&auto=format%2Ccompress&fit=max",
+                    source="marvelof.com", author="TMOE Desk",
+                    description="OPPO F33 Pro 5G expected to debut in India soon with bigger battery, IP69K rating, and slight price hike."
+                ),
+                ContentPiece(
+                    title="Samsung Galaxy S26 vs iPhone 16 vs Pixel 9 Pro: Which Is Best In 2026?",
+                    url="https://marvelof.com/gadgets/samsung-galaxy-s26-vs-iphone-16-vs-pixel-9-pro-which-is-best-in-2026",
+                    publisher_id=pub_id, brand_id=brand_id,
+                    published_date="2026-04-05T10:00:00+00:00",
+                    image_url="https://media.assettype.com/marvelof%2F2026-04-05%2Fvrkyhtv8%2FGalaxy-S26-iPhone-16-Or-Pixel-9-Pro?w=480&auto=format%2Ccompress&fit=max",
+                    source="marvelof.com", author="Naveen Kumar",
+                    description="Galaxy S26, iPhone 16, or Pixel 9 Pro - find out which flagship wins in 2026."
+                ),
+                ContentPiece(
+                    title="Best Camera Phones Under Rs 50,000 In 2026",
+                    url="https://marvelof.com/gadgets/best-camera-phones-under-50000-in-2026",
+                    publisher_id=pub_id, brand_id=brand_id,
+                    published_date="2026-04-05T08:30:00+00:00",
+                    image_url="https://media.assettype.com/marvelof%2F2026-04-05%2Fu9l0kq7e%2Fbest-phone-camera?w=480&auto=format%2Ccompress&fit=max",
+                    source="marvelof.com", author="TMOE Desk",
+                    description="From Vivo to Pixel, find the perfect camera phone for your budget."
+                ),
+                ContentPiece(
+                    title="5 Signs It's Time To Upgrade Your Smartphone",
+                    url="https://marvelof.com/gadgets/5-signs-its-time-to-upgrade-your-smartphone",
+                    publisher_id=pub_id, brand_id=brand_id,
+                    published_date="2026-04-05T06:15:00+00:00",
+                    image_url="https://media.assettype.com/marvelof%2F2026-04-05%2Fd8gnkir7%2FChange-Smartphone?w=480&auto=format%2Ccompress&fit=max",
+                    source="marvelof.com", author="Naveen Kumar",
+                    description="From battery drain to lag, here's how to know your phone needs replacing."
+                ),
+                ContentPiece(
+                    title="Get Salon-Like Treatment At Home With These Nourishing Hair Masks Under Rs 1,000",
+                    url="https://marvelof.com/fashion/get-salon-like-treatment-at-home-with-these-nourishing-hair-masks-under-rs-1000",
+                    publisher_id=pub_id, brand_id=brand_id,
+                    published_date="2026-04-02T11:30:00+00:00",
+                    image_url="https://media.assettype.com/marvelof%2F2026-04-02%2F26n06p6a%2FUntitled-design-2026-04-02T164842.095.jpg?w=480&auto=format%2Ccompress&fit=max",
+                    source="marvelof.com", author="Puja Menon",
+                    description="Struggling with dull and damaged hair? Here are some effective and budget-friendly hair masks you can try."
+                ),
+                ContentPiece(
+                    title="Struggling With Dry Hands? Try These Nourishing Hand Creams",
+                    url="https://marvelof.com/fashion/struggling-with-dry-hands-try-these-nourishing-hand-creams",
+                    publisher_id=pub_id, brand_id=brand_id,
+                    published_date="2026-04-02T09:00:00+00:00",
+                    image_url="",
+                    source="marvelof.com", author="TMOE Desk",
+                    description="Keep your hands soft and moisturized with these nourishing hand creams available on Amazon."
+                ),
+                ContentPiece(
+                    title="Smart TVs Under Rs 70,000: Enjoy Cinema-Like Experience At Home",
+                    url="https://marvelof.com/gadgets/smart-tvs-under-rs-70000-enjoy-cinema-like-experience-at-home",
+                    publisher_id=pub_id, brand_id=brand_id,
+                    published_date="2026-03-23T10:00:00+00:00",
+                    image_url="https://media.assettype.com/marvelof%2F2026-03-19%2F6jomdog4%2FUntitled-design-2026-03-19T181238.102.jpg?w=480&auto=format%2Ccompress&fit=max",
+                    source="marvelof.com", author="Puja Menon",
+                    description="Explore smart TVs under Rs 70,000 on Amazon and upgrade your home entertainment setup."
+                ),
+                ContentPiece(
+                    title="Best Wired Earphones Under Rs 600 on Amazon",
+                    url="https://marvelof.com/gadgets/best-wired-earphones-for-clear-sound-and-everyday-use-on-amazon",
+                    publisher_id=pub_id, brand_id=brand_id,
+                    published_date="2026-03-19T08:00:00+00:00",
+                    image_url="https://media.assettype.com/marvelof%2F2026-03-19%2F1iuqmnlm%2Fwired-earphones.jpg?w=480&auto=format%2Ccompress&fit=max",
+                    source="marvelof.com", author="TMOE Desk",
+                    description="Take a look at wired earphones priced under Rs 600 available on Amazon."
+                ),
+            ]
+            await db.content_pieces.insert_many([a.model_dump() for a in articles])
+            logger.info(f"Seeded {len(articles)} Amazon articles from marvelof.com")
+
+        # 7. Seed default benchmarks
+        if await db.roi_benchmarks.count_documents({}) == 0:
+            benchmarks = [
+                {"category": "Technology", "cvr": 0.02, "aov": 150.0, "traffic_multiplier": 10, "ctr": 0.05},
+                {"category": "Fashion", "cvr": 0.03, "aov": 80.0, "traffic_multiplier": 12, "ctr": 0.06},
+                {"category": "Food & Beverage", "cvr": 0.025, "aov": 50.0, "traffic_multiplier": 15, "ctr": 0.07},
+                {"category": "Health & Wellness", "cvr": 0.035, "aov": 120.0, "traffic_multiplier": 8, "ctr": 0.055},
+                {"category": "Home & Garden", "cvr": 0.028, "aov": 100.0, "traffic_multiplier": 10, "ctr": 0.05},
+            ]
+            for b in benchmarks:
+                await db.roi_benchmarks.insert_one(ROIBenchmark(**b).model_dump())
+            logger.info("Seeded default ROI benchmarks")
+
+        logger.info("Startup seed complete")
+    except Exception as e:
+        logger.error(f"Startup seed error: {e}")
+
 @app.on_event("shutdown")
 async def shutdown_db_client():
     client.close()

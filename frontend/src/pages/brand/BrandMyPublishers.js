@@ -73,7 +73,7 @@ export default function BrandMyPublishers() {
 
                 {/* Publisher Info */}
                 <h3 className="font-heading text-xl font-bold text-foreground mb-2">
-                  {pubData.profile?.name || pubData.user.email}
+                  {pubData.profile?.name || pubData.user.company_name || pubData.user.email}
                 </h3>
                 
                 {pubData.profile?.website && (
