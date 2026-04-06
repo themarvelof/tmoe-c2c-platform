@@ -14,7 +14,7 @@ import { Plus } from '@phosphor-icons/react';
 export default function AdminCampaigns() {
   const navigate = useNavigate();
   const [campaigns, setCampaigns] = useState([]);
-  const [users, setUsers] = useState([]);
+  const [users, setUsers] = useState({ publishers: [] });
   const [benchmarks, setBenchmarks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
@@ -43,14 +43,32 @@ export default function AdminCampaigns() {
 
   const fetchData = async () => {
     try {
-      const [campaignsRes, usersRes, benchmarksRes] = await Promise.all([
+      const [campaignsRes, usersRes, benchmarksRes, publishersRes, brandsRes] = await Promise.all([
         axios.get(`${API}/campaigns`),
         axios.get(`${API}/admin/users`),
-        axios.get(`${API}/roi-benchmarks`)
+        axios.get(`${API}/roi-benchmarks`),
+        axios.get(`${API}/admin/publishers-list`),
+        axios.get(`${API}/admin/brands-list`)
       ]);
       setCampaigns(campaignsRes.data);
-      setUsers(usersRes.data);
       setBenchmarks(benchmarksRes.data);
+      
+      // Extract publishers for easy selection
+      const publishersList = publishersRes.data.map(p => ({
+        id: p.user.id,
+        email: p.user.email,
+        name: p.profile?.name || p.user.email,
+        company: p.user.company_name
+      }));
+      
+      // Extract brands for easy selection
+      const brandsList = brandsRes.data.map(b => ({
+        id: b.user.id,
+        email: b.user.email,
+        name: b.profile?.company_name || b.user.email
+      }));
+      
+      setUsers({ publishers: publishersList, brands: brandsList, all: usersRes.data });
     } catch (error) {
       toast.error('Failed to load data');
     } finally {
@@ -192,8 +210,6 @@ export default function AdminCampaigns() {
     }
   };
 
-  const brands = users.filter(u => u.role === 'brand' && u.status === 'approved');
-
   if (loading) {
     return (
       <DashboardLayout role="admin">
@@ -258,8 +274,8 @@ export default function AdminCampaigns() {
                       <SelectValue placeholder="Select brand" />
                     </SelectTrigger>
                     <SelectContent>
-                      {brands.map(b => (
-                        <SelectItem key={b.id} value={b.id}>{b.email} - {b.company_name}</SelectItem>
+                      {users.brands && users.brands.map(b => (
+                        <SelectItem key={b.id} value={b.id}>{b.name} ({b.email})</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -278,14 +294,17 @@ export default function AdminCampaigns() {
                 </div>
 
                 <div>
-                  <Label htmlFor="assigned_publishers">Assigned Publisher IDs (comma-separated)</Label>
+                  <Label htmlFor="assigned_publishers">Initial Publishers (optional - can assign later)</Label>
                   <Input
                     id="assigned_publishers"
                     value={campaignForm.assigned_publishers}
                     onChange={(e) => setCampaignForm({ ...campaignForm, assigned_publishers: e.target.value })}
-                    placeholder="Publisher user IDs"
+                    placeholder="Leave empty to assign later using 'Assign Publisher' button"
                     className="mt-1"
                   />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Better to create campaign first, then use "Assign Publisher" button
+                  </p>
                 </div>
 
                 <div>
@@ -464,7 +483,7 @@ export default function AdminCampaigns() {
         <Dialog open={showAssignDialog} onOpenChange={setShowAssignDialog}>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Assign Publisher by Email</DialogTitle>
+              <DialogTitle>Assign Publisher to Campaign</DialogTitle>
             </DialogHeader>
             <form onSubmit={handleAssignPublisher} className="space-y-4">
               <div className="bg-muted p-4 rounded-lg">
@@ -473,24 +492,52 @@ export default function AdminCampaigns() {
               </div>
 
               <div>
-                <Label htmlFor="publisher_email">Publisher Email (Unique ID)</Label>
-                <Input
-                  id="publisher_email"
-                  type="email"
+                <Label htmlFor="publisher_email">Select Publisher</Label>
+                <Select
                   value={publisherEmail}
-                  onChange={(e) => setPublisherEmail(e.target.value)}
-                  placeholder="abhishek@marvelof.com"
-                  required
-                  className="mt-1"
-                  data-testid="publisher-email-input"
-                />
+                  onValueChange={setPublisherEmail}
+                >
+                  <SelectTrigger className="mt-1" data-testid="publisher-select">
+                    <SelectValue placeholder="Choose a publisher..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {users.publishers && users.publishers.length > 0 ? (
+                      users.publishers.map((pub) => (
+                        <SelectItem key={pub.id} value={pub.email} data-testid={`publisher-option-${pub.email}`}>
+                          <div className="flex flex-col">
+                            <span className="font-medium">{pub.name}</span>
+                            <span className="text-xs text-muted-foreground">{pub.email}</span>
+                          </div>
+                        </SelectItem>
+                      ))
+                    ) : (
+                      <SelectItem value="none" disabled>No publishers available</SelectItem>
+                    )}
+                  </SelectContent>
+                </Select>
                 <p className="text-xs text-muted-foreground mt-1">
-                  Enter the publisher's registered email address
+                  Select from approved publishers on the platform
                 </p>
               </div>
 
+              {selectedCampaign?.assigned_publishers && selectedCampaign.assigned_publishers.length > 0 && (
+                <div className="bg-muted p-4 rounded-lg">
+                  <p className="text-sm font-semibold mb-2">Currently Assigned:</p>
+                  <div className="space-y-1">
+                    {selectedCampaign.assigned_publishers.map((pubId) => {
+                      const publisher = users.publishers?.find(p => p.id === pubId);
+                      return publisher ? (
+                        <div key={pubId} className="text-sm flex justify-between items-center">
+                          <span>{publisher.email}</span>
+                        </div>
+                      ) : null;
+                    })}
+                  </div>
+                </div>
+              )}
+
               <div className="flex gap-4">
-                <Button type="submit" disabled={submitting} className="bg-primary text-primary-foreground">
+                <Button type="submit" disabled={submitting || !publisherEmail} className="bg-primary text-primary-foreground">
                   {submitting ? 'Assigning...' : 'Assign Publisher'}
                 </Button>
                 <Button type="button" variant="outline" onClick={() => setShowAssignDialog(false)}>
