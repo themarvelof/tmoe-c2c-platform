@@ -42,11 +42,11 @@ export default function DashboardLayout({ children, role }) {
   const navItems = getNavItems();
 
   return (
-    <div className="min-h-screen flex">
+    <div className="min-h-screen flex bg-muted">
       {/* Sidebar */}
-      <aside className="w-64 border-r border-foreground bg-background">
-        <div className="p-6 border-b border-foreground">
-          <h1 className="font-heading text-2xl font-bold">TMOE</h1>
+      <aside className="w-64 border-r bg-white">
+        <div className="p-6 border-b">
+          <h1 className="font-heading text-2xl font-bold text-foreground">TMOE</h1>
           <p className="text-sm text-muted-foreground mt-1 capitalize">{role} Portal</p>
         </div>
 
@@ -59,10 +59,10 @@ export default function DashboardLayout({ children, role }) {
                 key={item.path}
                 onClick={() => navigate(item.path)}
                 className={
-                  `w-full flex items-center gap-3 px-4 py-3 mb-2 transition-all ${
+                  `w-full flex items-center gap-3 px-4 py-3 mb-2 rounded-lg transition-all ${
                     isActive
-                      ? 'bg-foreground text-background'
-                      : 'hover:bg-muted'
+                      ? 'bg-primary text-primary-foreground'
+                      : 'hover:bg-muted text-foreground'
                   }`
                 }
                 data-testid={`nav-${item.label.toLowerCase()}`}
@@ -74,15 +74,15 @@ export default function DashboardLayout({ children, role }) {
           })}
         </nav>
 
-        <div className="absolute bottom-0 w-64 p-4 border-t border-foreground">
+        <div className="absolute bottom-0 w-64 p-4 border-t bg-white">
           <div className="mb-3">
-            <p className="text-sm font-medium">{user?.email}</p>
+            <p className="text-sm font-medium text-foreground">{user?.email}</p>
             <p className="text-xs text-muted-foreground capitalize">{user?.role}</p>
           </div>
           <Button
             variant="outline"
             onClick={handleLogout}
-            className="w-full border-foreground hover:bg-foreground hover:text-background"
+            className="w-full border hover:bg-muted"
             data-testid="logout-button"
           >
             <SignOut size={20} weight="regular" className="mr-2" />
@@ -92,7 +92,7 @@ export default function DashboardLayout({ children, role }) {
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 overflow-auto">
+      <main className="flex-1 overflow-auto bg-white">
         {children}
       </main>
     </div>

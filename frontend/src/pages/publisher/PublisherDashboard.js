@@ -41,44 +41,44 @@ export default function PublisherDashboard() {
 
   return (
     <DashboardLayout role="publisher">
-      <div className="p-8" data-testid="publisher-dashboard">
-        <h1 className="font-heading text-4xl font-bold mb-8">Dashboard</h1>
+      <div className="p-8 bg-muted min-h-screen" data-testid="publisher-dashboard">
+        <h1 className="font-heading text-4xl font-bold mb-8 text-foreground">Dashboard</h1>
 
         {/* Stats Grid */}
         <div className="grid md:grid-cols-3 gap-6 mb-8">
-          <div className="border border-foreground p-6" data-testid="stat-active-campaigns">
+          <div className="bg-white rounded-lg border p-6 hover:shadow-lg transition-shadow" data-testid="stat-active-campaigns">
             <div className="flex items-center justify-between mb-4">
-              <Briefcase size={32} weight="regular" />
-              <div className="font-mono text-3xl font-bold">{activeCampaigns}</div>
+              <Briefcase size={32} weight="regular" className="text-primary" />
+              <div className="font-mono text-3xl font-bold text-foreground">{activeCampaigns}</div>
             </div>
-            <div className="text-sm font-medium">Active Campaigns</div>
+            <div className="text-sm font-medium text-muted-foreground">Active Campaigns</div>
           </div>
 
-          <div className="border border-foreground p-6" data-testid="stat-total-earnings">
+          <div className="bg-white rounded-lg border p-6 hover:shadow-lg transition-shadow" data-testid="stat-total-earnings">
             <div className="flex items-center justify-between mb-4">
-              <CurrencyDollar size={32} weight="regular" />
-              <div className="font-mono text-3xl font-bold">
+              <CurrencyDollar size={32} weight="regular" className="text-primary" />
+              <div className="font-mono text-3xl font-bold text-foreground">
                 ${earnings?.total_earnings?.toLocaleString() || 0}
               </div>
             </div>
-            <div className="text-sm font-medium">Total Earnings</div>
+            <div className="text-sm font-medium text-muted-foreground">Total Earnings</div>
           </div>
 
-          <div className="border border-foreground p-6" data-testid="stat-pending-payout">
+          <div className="bg-white rounded-lg border p-6 hover:shadow-lg transition-shadow" data-testid="stat-pending-payout">
             <div className="flex items-center justify-between mb-4">
-              <ChartLineUp size={32} weight="regular" />
-              <div className="font-mono text-3xl font-bold">
+              <ChartLineUp size={32} weight="regular" className="text-primary" />
+              <div className="font-mono text-3xl font-bold text-foreground">
                 ${earnings?.pending_payout?.toLocaleString() || 0}
               </div>
             </div>
-            <div className="text-sm font-medium">Pending Payout</div>
+            <div className="text-sm font-medium text-muted-foreground">Pending Payout</div>
           </div>
         </div>
 
         {/* Recent Campaigns */}
-        <div className="border border-foreground" data-testid="recent-campaigns-section">
-          <div className="border-b border-foreground p-6">
-            <h2 className="font-heading text-2xl font-bold">Recent Campaigns</h2>
+        <div className="bg-white rounded-lg border" data-testid="recent-campaigns-section">
+          <div className="border-b p-6">
+            <h2 className="font-heading text-2xl font-bold text-foreground">Recent Campaigns</h2>
           </div>
           <div className="p-6">
             {campaigns.length === 0 ? (
@@ -89,30 +89,30 @@ export default function PublisherDashboard() {
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead>
-                    <tr className="border-b border-foreground text-left">
-                      <th className="pb-3 font-medium">Campaign</th>
-                      <th className="pb-3 font-medium">Category</th>
-                      <th className="pb-3 font-medium">Status</th>
-                      <th className="pb-3 font-medium">Budget</th>
+                    <tr className="border-b text-left">
+                      <th className="pb-3 font-medium text-foreground">Campaign</th>
+                      <th className="pb-3 font-medium text-foreground">Category</th>
+                      <th className="pb-3 font-medium text-foreground">Status</th>
+                      <th className="pb-3 font-medium text-foreground">Budget</th>
                     </tr>
                   </thead>
                   <tbody>
                     {campaigns.slice(0, 5).map((campaign) => (
                       <tr key={campaign.id} className="border-b border-border" data-testid={`campaign-row-${campaign.id}`}>
                         <td className="py-4">{campaign.name}</td>
-                        <td className="py-4">{campaign.category}</td>
+                        <td className="py-4 text-muted-foreground">{campaign.category}</td>
                         <td className="py-4">
                           <span className={
-                            `px-3 py-1 text-xs font-medium border ${
-                              campaign.status === 'active' ? 'bg-accent border-foreground' :
-                              campaign.status === 'completed' ? 'bg-muted border-foreground' :
-                              'border-foreground'
+                            `px-3 py-1 text-xs font-medium rounded-full ${
+                              campaign.status === 'active' ? 'bg-accent text-accent-foreground' :
+                              campaign.status === 'completed' ? 'bg-muted text-muted-foreground' :
+                              'bg-muted text-muted-foreground'
                             }`
                           }>
                             {campaign.status.toUpperCase()}
                           </span>
                         </td>
-                        <td className="py-4 font-mono">
+                        <td className="py-4 font-mono text-foreground">
                           ${(campaign.content_budget + campaign.distribution_budget).toLocaleString()}
                         </td>
                       </tr>
