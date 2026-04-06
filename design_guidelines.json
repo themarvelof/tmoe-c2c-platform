@@ -1,0 +1,87 @@
+{
+  "project_name": "TMOE Content-to-Commerce Platform",
+  "theme": "Light",
+  "archetype": "4 (Swiss & High-Contrast)",
+  "emotional_tone": "Objective, rigid, functional, high-end enterprise, trustworthy",
+  "fonts": {
+    "heading": "Cabinet Grotesk",
+    "body": "Satoshi",
+    "mono": "IBM Plex Mono",
+    "weights": {
+      "heading": "font-black, font-bold",
+      "body": "font-normal, font-medium"
+    },
+    "instructions": "Use Cabinet Grotesk for all major headings. Never use Inter for headings. Use Satoshi for standard body text. Use IBM Plex Mono for all data, numbers, and ROI estimates to give a technical, precise edge. Ensure tight letter spacing (tracking-tight) for large headlines."
+  },
+  "colors": {
+    "background": "#F9F9F9",
+    "foreground": "#0A0A0A",
+    "primary": "#0020F5",
+    "primary_foreground": "#FFFFFF",
+    "muted": "#E5E5E5",
+    "muted_foreground": "#737373",
+    "border": "#D4D4D4",
+    "accent": "#FFDF00",
+    "instructions": "High contrast Swiss brutalism. The UI should be predominantly monochrome (white/grey/black). Use Primary (Klein Blue) exclusively for primary CTAs and active states. Use Accent (Yellow) for warnings or specific callouts. Never use muddy greys. Ensure focus states have higher contrast."
+  },
+  "spacing_and_layout": {
+    "grid_system": "Control Room Grid",
+    "spacing_scale": "p-2, p-4, p-6, p-8, p-12",
+    "instructions": "Dense, compact spacing for dashboards (gap-4 or gap-6). Use The 'Control Room' grid for analytics (grid-cols-1 md:grid-cols-3 lg:grid-cols-4). Every pixel must be utilized. Use sharp edges (rounded-none) or very subtle radii (rounded-sm max 4px) for all components. Visible grid borders (border-collapse style) are highly encouraged."
+  },
+  "components": {
+    "cards": "Cardless or flat cards with 1px solid border (#0A0A0A or #D4D4D4) and sharp corners. Neo-brutalist hard shadows (e.g., shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]) can be used for elevated elements.",
+    "buttons": "Sharp corners, solid colors. Primary button: bg-primary text-white hover:bg-blue-800. Secondary: border border-foreground bg-transparent hover:bg-foreground hover:text-white.",
+    "inputs": "Shadcn inputs heavily customized to have sharp corners, 1px black/grey borders, and high contrast focus states (focus:ring-2 focus:ring-primary focus:border-transparent).",
+    "navigation": "Solid background, hard bottom border. Visible navigation links on desktop, avoid burying behind hamburgers on large screens.",
+    "charts": "Use Recharts/Shadcn charts with primary and monochrome colors. Keep data visualizations clean, sharp, and high-contrast."
+  },
+  "motion_and_interactions": {
+    "hover_states": "Crisp transitions. Always explicitly set text color on hover. Slight lift (-translate-y-1) and hard shadow for interactive cards.",
+    "animations": "Minimalist micro-interactions. Fast transitions (150ms-200ms ease)."
+  },
+  "icons_and_assets": {
+    "icon_library": "@phosphor-icons/react",
+    "instructions": "Use Phosphor Icons (Regular or Bold weight) for crisp, professional, and technical dashboard iconography. Run `yarn add @phosphor-icons/react`.",
+    "images": [
+      {
+        "url": "https://images.pexels.com/photos/3062948/pexels-photo-3062948.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+        "description": "Minimalist abstract white interior space, ideal for the login/registration split-screen background.",
+        "category": "hero_background"
+      },
+      {
+        "url": "https://images.pexels.com/photos/62693/pexels-photo-62693.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+        "description": "Soft natural light casting geometric shadows, alternative background for onboarding wizard.",
+        "category": "onboarding_background"
+      },
+      {
+        "url": "https://images.unsplash.com/photo-1609371497456-3a55a205d5eb?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDk1ODF8MHwxfHNlYXJjaHwxfHxwcm9mZXNzaW9uYWwlMjBoZWFkc2hvdCUyMGF2YXRhcnxlbnwwfHx8fDE3NzU0NzA4MTl8MA&ixlib=rb-4.1.0&q=85",
+        "description": "Professional avatar 1 for Publisher/Brand profiles.",
+        "category": "avatar"
+      },
+      {
+        "url": "https://images.unsplash.com/photo-1768247695726-022586dea3a1?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDk1ODF8MHwxfHNlYXJjaHwzfHxwcm9mZXNzaW9uYWwlMjBoZWFkc2hvdCUyMGF2YXRhcnxlbnwwfHx8fDE3NzU0NzA4MTl8MA&ixlib=rb-4.1.0&q=85",
+        "description": "Professional avatar 2 for Admin profiles.",
+        "category": "avatar"
+      },
+      {
+        "url": "https://images.pexels.com/photos/36535613/pexels-photo-36535613.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+        "description": "Professional avatar 3",
+        "category": "avatar"
+      }
+    ]
+  },
+  "accessibility_and_testing": {
+    "contrast": "Ensure all text meets minimum 4.5:1 ratio against backgrounds.",
+    "testing": "All interactive and key informational elements MUST include a data-testid attribute (e.g., data-testid='login-submit-button')."
+  },
+  "instructions_to_main_agent": [
+    "Install @phosphor-icons/react for iconography.",
+    "Add Google Fonts or Fontshare imports for Cabinet Grotesk, Satoshi, and IBM Plex Mono in index.css.",
+    "Implement the 'Swiss Brutalist' aesthetic: visible borders (1px solid), sharp corners (rounded-none), and high contrast (Black/White/Klein Blue).",
+    "Do NOT use soft shadows or glassmorphism. Use solid backgrounds or 'neo-brutalist' hard shadows.",
+    "Use pure HTML + Tailwind for macro-layouts, but rely on Shadcn UI (heavily customized to be sharp and brutalist) for complex interactive forms, tables, and tabs.",
+    "The dashboard layout should follow the 'Control Room' grid—dense, utilizing all space, with clear data hierarchy.",
+    "In the ROI estimator and data tables, use a monospace font like IBM Plex Mono for numbers."
+  ]
+}
