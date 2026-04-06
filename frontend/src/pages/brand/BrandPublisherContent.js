@@ -103,52 +103,78 @@ export default function BrandPublisherContent() {
             )}
           </div>
         ) : (
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {content.map((piece) => (
-              <div
-                key={piece.id}
-                className="bg-white rounded-lg border overflow-hidden hover:shadow-lg transition-shadow"
-                data-testid={`content-${piece.id}`}
-              >
-                {piece.image_url && (
-                  <img
-                    src={piece.image_url}
-                    alt={piece.title}
-                    className="w-full h-48 object-cover"
-                  />
-                )}
-                
-                <div className="p-6">
-                  <h3 className="font-heading text-lg font-bold text-foreground mb-2 line-clamp-2">
-                    {piece.title}
-                  </h3>
-                  
-                  {piece.description && (
-                    <p className="text-sm text-muted-foreground mb-4 line-clamp-3">
-                      {piece.description}
-                    </p>
-                  )}
+          <div className="space-y-10" data-testid="content-date-groups">
+            {Object.entries(
+              content.reduce((groups, piece) => {
+                const dateKey = new Date(piece.published_date).toLocaleDateString('en-US', {
+                  year: 'numeric',
+                  month: 'long',
+                  day: 'numeric',
+                });
+                if (!groups[dateKey]) groups[dateKey] = [];
+                groups[dateKey].push(piece);
+                return groups;
+              }, {})
+            ).map(([date, articles]) => (
+              <div key={date} data-testid={`date-group-${date}`}>
+                <div className="flex items-center gap-3 mb-5">
+                  <Calendar size={20} className="text-primary" />
+                  <h2 className="font-heading text-xl font-bold text-foreground">{date}</h2>
+                  <span className="text-xs font-medium text-muted-foreground bg-muted px-2.5 py-1 rounded-full">
+                    {articles.length} {articles.length === 1 ? 'article' : 'articles'}
+                  </span>
+                  <div className="flex-1 h-px bg-border ml-2" />
+                </div>
 
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground mb-4">
-                    <Calendar size={14} />
-                    <span>{new Date(piece.published_date).toLocaleDateString()}</span>
-                  </div>
+                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {articles.map((piece) => (
+                    <div
+                      key={piece.id}
+                      className="bg-white rounded-lg border overflow-hidden hover:shadow-lg transition-shadow"
+                      data-testid={`content-${piece.id}`}
+                    >
+                      {piece.image_url && (
+                        <img
+                          src={piece.image_url}
+                          alt={piece.title}
+                          className="w-full h-48 object-cover"
+                        />
+                      )}
+                      
+                      <div className="p-6">
+                        <h3 className="font-heading text-lg font-bold text-foreground mb-2 line-clamp-2">
+                          {piece.title}
+                        </h3>
+                        
+                        {piece.description && (
+                          <p className="text-sm text-muted-foreground mb-4 line-clamp-3">
+                            {piece.description}
+                          </p>
+                        )}
 
-                  {piece.author && (
-                    <div className="text-xs text-muted-foreground mb-4">
-                      By {piece.author}
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground mb-4">
+                          <Calendar size={14} />
+                          <span>{new Date(piece.published_date).toLocaleDateString()}</span>
+                        </div>
+
+                        {piece.author && (
+                          <div className="text-xs text-muted-foreground mb-4">
+                            By {piece.author}
+                          </div>
+                        )}
+
+                        <a
+                          href={piece.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-2 text-primary hover:underline text-sm font-medium"
+                        >
+                          <LinkIcon size={16} />
+                          Read Article
+                        </a>
+                      </div>
                     </div>
-                  )}
-
-                  <a
-                    href={piece.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-2 text-primary hover:underline text-sm font-medium"
-                  >
-                    <LinkIcon size={16} />
-                    Read Article
-                  </a>
+                  ))}
                 </div>
               </div>
             ))}
