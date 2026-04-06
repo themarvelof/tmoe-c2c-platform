@@ -872,6 +872,56 @@ async def update_campaign(
         raise HTTPException(status_code=404, detail="Campaign not found")
     return {"message": "Campaign updated successfully"}
 
+@api_router.put("/campaigns/{campaign_id}/assign-publisher")
+async def assign_publisher_to_campaign(
+    campaign_id: str,
+    publisher_email: str,
+    current_user: UserResponse = Depends(require_role([UserRole.ADMIN]))
+):
+    """Assign a publisher to a campaign using their email"""
+    # Find publisher by email
+    publisher = await db.users.find_one({"email": publisher_email, "role": UserRole.PUBLISHER}, {"_id": 0})
+    if not publisher:
+        raise HTTPException(status_code=404, detail=f"Publisher with email {publisher_email} not found")
+    
+    # Add publisher to campaign's assigned_publishers
+    result = await db.campaigns.update_one(
+        {"id": campaign_id},
+        {"$addToSet": {"assigned_publishers": publisher["id"]}}
+    )
+    
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Campaign not found")
+    
+    return {
+        "message": f"Publisher {publisher_email} assigned to campaign",
+        "publisher_id": publisher["id"],
+        "publisher_email": publisher["email"]
+    }
+
+@api_router.put("/campaigns/{campaign_id}/remove-publisher")
+async def remove_publisher_from_campaign(
+    campaign_id: str,
+    publisher_email: str,
+    current_user: UserResponse = Depends(require_role([UserRole.ADMIN]))
+):
+    """Remove a publisher from a campaign using their email"""
+    # Find publisher by email
+    publisher = await db.users.find_one({"email": publisher_email, "role": UserRole.PUBLISHER}, {"_id": 0})
+    if not publisher:
+        raise HTTPException(status_code=404, detail=f"Publisher with email {publisher_email} not found")
+    
+    # Remove publisher from campaign's assigned_publishers
+    result = await db.campaigns.update_one(
+        {"id": campaign_id},
+        {"$pull": {"assigned_publishers": publisher["id"]}}
+    )
+    
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Campaign not found")
+    
+    return {"message": f"Publisher {publisher_email} removed from campaign"}
+
 @api_router.delete("/campaigns/{campaign_id}")
 async def delete_campaign(
     campaign_id: str,

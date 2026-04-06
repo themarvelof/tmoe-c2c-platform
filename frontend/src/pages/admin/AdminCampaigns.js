@@ -18,6 +18,10 @@ export default function AdminCampaigns() {
   const [benchmarks, setBenchmarks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [showEditDialog, setShowEditDialog] = useState(false);
+  const [showAssignDialog, setShowAssignDialog] = useState(false);
+  const [selectedCampaign, setSelectedCampaign] = useState(null);
+  const [publisherEmail, setPublisherEmail] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [campaignForm, setCampaignForm] = useState({
     name: '',
@@ -100,6 +104,82 @@ export default function AdminCampaigns() {
     } catch (error) {
       toast.error('Failed to update status');
     }
+  };
+
+  const handleEditCampaign = (campaign) => {
+    setSelectedCampaign(campaign);
+    setCampaignForm({
+      name: campaign.name,
+      category: campaign.category,
+      target_markets: campaign.target_markets.join(', '),
+      assigned_publishers: campaign.assigned_publishers.join(', '),
+      assigned_brand: campaign.assigned_brand,
+      content_type: campaign.content_type,
+      content_budget: campaign.content_budget.toString(),
+      distribution_budget: campaign.distribution_budget.toString(),
+      commerce_links: campaign.commerce_links.join(', '),
+      start_date: campaign.start_date || '',
+      end_date: campaign.end_date || ''
+    });
+    setShowEditDialog(true);
+  };
+
+  const handleUpdateCampaign = async (e) => {
+    e.preventDefault();
+    setSubmitting(true);
+
+    try {
+      const payload = {
+        name: campaignForm.name,
+        category: campaignForm.category,
+        target_markets: campaignForm.target_markets.split(',').map(c => c.trim()),
+        assigned_publishers: campaignForm.assigned_publishers.split(',').map(c => c.trim()).filter(c => c),
+        assigned_brand: campaignForm.assigned_brand,
+        content_type: campaignForm.content_type,
+        content_budget: parseFloat(campaignForm.content_budget),
+        distribution_budget: parseFloat(campaignForm.distribution_budget),
+        commerce_links: campaignForm.commerce_links.split(',').map(c => c.trim()).filter(c => c),
+        start_date: campaignForm.start_date || null,
+        end_date: campaignForm.end_date || null
+      };
+
+      await axios.put(`${API}/campaigns/${selectedCampaign.id}`, payload);
+      toast.success('Campaign updated successfully!');
+      setShowEditDialog(false);
+      setSelectedCampaign(null);
+      fetchData();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Failed to update campaign');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleAssignPublisher = async (e) => {
+    e.preventDefault();
+    setSubmitting(true);
+
+    try {
+      await axios.put(
+        `${API}/campaigns/${selectedCampaign.id}/assign-publisher`,
+        null,
+        { params: { publisher_email: publisherEmail } }
+      );
+      toast.success(`Publisher ${publisherEmail} assigned successfully!`);
+      setShowAssignDialog(false);
+      setPublisherEmail('');
+      setSelectedCampaign(null);
+      fetchData();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Failed to assign publisher');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const openAssignDialog = (campaign) => {
+    setSelectedCampaign(campaign);
+    setShowAssignDialog(true);
   };
 
   const getStatusColor = (status) => {
@@ -291,6 +371,136 @@ export default function AdminCampaigns() {
           </Dialog>
         </div>
 
+        {/* Edit Campaign Dialog */}
+        <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
+          <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Edit Campaign</DialogTitle>
+            </DialogHeader>
+            <form onSubmit={handleUpdateCampaign} className="space-y-4">
+              <div className="grid md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="edit_name">Campaign Name</Label>
+                  <Input
+                    id="edit_name"
+                    value={campaignForm.name}
+                    onChange={(e) => setCampaignForm({ ...campaignForm, name: e.target.value })}
+                    required
+                    className="mt-1"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="edit_category">Category</Label>
+                  <Input
+                    id="edit_category"
+                    value={campaignForm.category}
+                    onChange={(e) => setCampaignForm({ ...campaignForm, category: e.target.value })}
+                    required
+                    className="mt-1"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <Label htmlFor="edit_target_markets">Target Markets (comma-separated)</Label>
+                <Input
+                  id="edit_target_markets"
+                  value={campaignForm.target_markets}
+                  onChange={(e) => setCampaignForm({ ...campaignForm, target_markets: e.target.value })}
+                  required
+                  className="mt-1"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="edit_content_type">Content Type</Label>
+                <Input
+                  id="edit_content_type"
+                  value={campaignForm.content_type}
+                  onChange={(e) => setCampaignForm({ ...campaignForm, content_type: e.target.value })}
+                  required
+                  className="mt-1"
+                />
+              </div>
+
+              <div className="grid md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="edit_content_budget">Content Budget ($)</Label>
+                  <Input
+                    id="edit_content_budget"
+                    type="number"
+                    value={campaignForm.content_budget}
+                    onChange={(e) => setCampaignForm({ ...campaignForm, content_budget: e.target.value })}
+                    required
+                    className="mt-1"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="edit_distribution_budget">Distribution Budget ($)</Label>
+                  <Input
+                    id="edit_distribution_budget"
+                    type="number"
+                    value={campaignForm.distribution_budget}
+                    onChange={(e) => setCampaignForm({ ...campaignForm, distribution_budget: e.target.value })}
+                    required
+                    className="mt-1"
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-4">
+                <Button type="submit" disabled={submitting} className="bg-primary text-primary-foreground">
+                  {submitting ? 'Updating...' : 'Update Campaign'}
+                </Button>
+                <Button type="button" variant="outline" onClick={() => setShowEditDialog(false)}>
+                  Cancel
+                </Button>
+              </div>
+            </form>
+          </DialogContent>
+        </Dialog>
+
+        {/* Assign Publisher Dialog */}
+        <Dialog open={showAssignDialog} onOpenChange={setShowAssignDialog}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Assign Publisher by Email</DialogTitle>
+            </DialogHeader>
+            <form onSubmit={handleAssignPublisher} className="space-y-4">
+              <div className="bg-muted p-4 rounded-lg">
+                <p className="text-sm font-semibold mb-2">Campaign:</p>
+                <p className="text-sm">{selectedCampaign?.name}</p>
+              </div>
+
+              <div>
+                <Label htmlFor="publisher_email">Publisher Email (Unique ID)</Label>
+                <Input
+                  id="publisher_email"
+                  type="email"
+                  value={publisherEmail}
+                  onChange={(e) => setPublisherEmail(e.target.value)}
+                  placeholder="abhishek@marvelof.com"
+                  required
+                  className="mt-1"
+                  data-testid="publisher-email-input"
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Enter the publisher's registered email address
+                </p>
+              </div>
+
+              <div className="flex gap-4">
+                <Button type="submit" disabled={submitting} className="bg-primary text-primary-foreground">
+                  {submitting ? 'Assigning...' : 'Assign Publisher'}
+                </Button>
+                <Button type="button" variant="outline" onClick={() => setShowAssignDialog(false)}>
+                  Cancel
+                </Button>
+              </div>
+            </form>
+          </DialogContent>
+        </Dialog>
+
         {campaigns.length === 0 ? (
           <div className="border border-foreground p-12 text-center">
             <p className="text-muted-foreground">No campaigns yet. Create your first campaign.</p>
@@ -327,12 +537,25 @@ export default function AdminCampaigns() {
                           `${(campaign.estimated_outcomes.roi * 100).toFixed(1)}%` : '-'}
                       </td>
                       <td className="p-4">
-                        <div className="flex gap-2">
+                        <div className="flex gap-2 flex-wrap">
                           <button
                             onClick={() => navigate(`/campaigns/${campaign.id}`)}
                             className="text-primary hover:underline text-sm"
                           >
                             View
+                          </button>
+                          <button
+                            onClick={() => handleEditCampaign(campaign)}
+                            className="text-primary hover:underline text-sm"
+                            data-testid={`edit-campaign-${campaign.id}`}
+                          >
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => openAssignDialog(campaign)}
+                            className="text-primary hover:underline text-sm"
+                          >
+                            Assign Publisher
                           </button>
                           {campaign.status === 'draft' && (
                             <button
