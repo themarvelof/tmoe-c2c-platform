@@ -16,7 +16,9 @@ import AdminUsers from './pages/admin/AdminUsers';
 import AdminCampaigns from './pages/admin/AdminCampaigns';
 import AdminBenchmarks from './pages/admin/AdminBenchmarks';
 import AdminSettlements from './pages/admin/AdminSettlements';
+import AdminCreateBrand from './pages/admin/AdminCreateBrand';
 import CampaignDetail from './pages/CampaignDetail';
+import BrandReporting from './pages/brand/BrandReporting';
 import { useAuth } from './hooks/useAuth';
 
 const ProtectedRoute = ({ children, allowedRoles }) => {
@@ -109,6 +111,14 @@ function App() {
               </ProtectedRoute>
             }
           />
+          <Route
+            path="/brand/reporting"
+            element={
+              <ProtectedRoute allowedRoles={['brand']}>
+                <BrandReporting />
+              </ProtectedRoute>
+            }
+          />
 
           {/* Admin Routes */}
           <Route
@@ -148,6 +158,14 @@ function App() {
             element={
               <ProtectedRoute allowedRoles={['admin']}>
                 <AdminSettlements />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/create-brand"
+            element={
+              <ProtectedRoute allowedRoles={['admin']}>
+                <AdminCreateBrand />
               </ProtectedRoute>
             }
           />

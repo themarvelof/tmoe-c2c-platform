@@ -26,12 +26,14 @@ export default function DashboardLayout({ children, role }) {
         { path: '/brand/dashboard', label: 'Dashboard', icon: ChartBar },
         { path: '/brand/profile', label: 'Profile', icon: User },
         { path: '/brand/campaigns', label: 'Campaigns', icon: Briefcase },
+        { path: '/brand/reporting', label: 'Reports', icon: ChartBar },
       ];
     } else if (role === 'admin') {
       return [
         { path: '/admin/dashboard', label: 'Dashboard', icon: ChartBar },
         { path: '/admin/users', label: 'Users', icon: User },
         { path: '/admin/campaigns', label: 'Campaigns', icon: Briefcase },
+        { path: '/admin/create-brand', label: 'Create Brand', icon: User },
         { path: '/admin/benchmarks', label: 'Benchmarks', icon: GearSix },
         { path: '/admin/settlements', label: 'Settlements', icon: CurrencyDollar },
       ];

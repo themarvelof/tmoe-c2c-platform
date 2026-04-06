@@ -71,6 +71,12 @@ class UserLogin(BaseModel):
     email: EmailStr
     password: str
 
+class AdminCreateBrand(BaseModel):
+    email: EmailStr
+    password: str
+    company_name: Optional[str] = None
+    website: Optional[str] = None
+
 class User(BaseModel):
     model_config = ConfigDict(extra="ignore")
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
@@ -268,6 +274,37 @@ class SettlementCreate(BaseModel):
 class SettlementUpdate(BaseModel):
     payout_status: str
 
+# Brand Reporting Models
+class BrandReportMetrics(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    impressions: int = 0
+    clicks: int = 0
+    conversions: int = 0
+    revenue: float = 0.0
+    ctr: float = 0.0
+    conversion_rate: float = 0.0
+    cost_per_click: float = 0.0
+    roas: float = 0.0
+
+class BrandReport(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    brand_id: str
+    report_date: str
+    period: str  # daily, weekly, monthly
+    metrics: BrandReportMetrics
+    campaign_breakdown: Optional[List[Dict[str, Any]]] = []
+    custom_data: Optional[Dict[str, Any]] = {}
+    created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+
+class BrandReportCreate(BaseModel):
+    brand_id: str
+    report_date: str
+    period: str
+    metrics: BrandReportMetrics
+    campaign_breakdown: Optional[List[Dict[str, Any]]] = []
+    custom_data: Optional[Dict[str, Any]] = {}
+
 # ==================== HELPER FUNCTIONS ====================
 
 def create_access_token(data: dict):
@@ -377,6 +414,40 @@ async def update_user_status(
 async def get_all_users(current_user: UserResponse = Depends(require_role([UserRole.ADMIN]))):
     users = await db.users.find({}, {"_id": 0}).to_list(1000)
     return [UserResponse(**u) for u in users]
+
+@api_router.post("/admin/users/create-brand")
+async def create_brand_account(
+    user_data: AdminCreateBrand,
+    current_user: UserResponse = Depends(require_role([UserRole.ADMIN]))
+):
+    # Check if user exists
+    existing = await db.users.find_one({"email": user_data.email}, {"_id": 0})
+    if existing:
+        raise HTTPException(status_code=400, detail="Email already registered")
+    
+    # Hash password
+    password_hash = pwd_context.hash(user_data.password)
+    
+    # Create brand user with approved status (admin created, so pre-approved)
+    user = User(
+        email=user_data.email,
+        password_hash=password_hash,
+        role=UserRole.BRAND,
+        status=UserStatus.APPROVED,  # Auto-approved since admin is creating
+        company_name=user_data.company_name,
+        website=user_data.website
+    )
+    
+    await db.users.insert_one(user.model_dump())
+    
+    return {
+        "message": "Brand account created successfully",
+        "user": UserResponse(**user.model_dump()),
+        "credentials": {
+            "email": user_data.email,
+            "password": user_data.password  # Return plaintext password for admin to share
+        }
+    }
 
 @api_router.get("/admin/dashboard/stats")
 async def get_dashboard_stats(current_user: UserResponse = Depends(require_role([UserRole.ADMIN]))):
@@ -523,6 +594,105 @@ async def get_brand_briefs(current_user: UserResponse = Depends(require_role([Us
 async def get_brand_campaigns(current_user: UserResponse = Depends(require_role([UserRole.BRAND]))):
     campaigns = await db.campaigns.find({"assigned_brand": current_user.id}, {"_id": 0}).to_list(1000)
     return [Campaign(**c) for c in campaigns]
+
+# ==================== BRAND REPORTING ROUTES ====================
+
+@api_router.post("/brand/reports")
+async def create_brand_report(
+    report_data: BrandReportCreate,
+    current_user: UserResponse = Depends(require_role([UserRole.BRAND, UserRole.ADMIN]))
+):
+    # Verify the brand exists if admin is creating
+    if current_user.role == UserRole.ADMIN:
+        brand = await db.users.find_one({"id": report_data.brand_id, "role": UserRole.BRAND}, {"_id": 0})
+        if not brand:
+            raise HTTPException(status_code=404, detail="Brand not found")
+    else:
+        # If brand is creating their own report
+        report_data.brand_id = current_user.id
+    
+    report = BrandReport(**report_data.model_dump())
+    await db.brand_reports.insert_one(report.model_dump())
+    return report
+
+@api_router.post("/api-webhook/brand-reports")
+async def webhook_create_brand_report(report_data: BrandReportCreate):
+    """
+    External API webhook endpoint for receiving brand reporting data
+    This endpoint doesn't require authentication for external integrations
+    """
+    # Verify the brand exists
+    brand = await db.users.find_one({"id": report_data.brand_id, "role": UserRole.BRAND}, {"_id": 0})
+    if not brand:
+        raise HTTPException(status_code=404, detail="Brand not found")
+    
+    report = BrandReport(**report_data.model_dump())
+    await db.brand_reports.insert_one(report.model_dump())
+    return {"message": "Report created successfully", "report_id": report.id}
+
+@api_router.get("/brand/reports")
+async def get_brand_reports(
+    period: Optional[str] = None,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    current_user: UserResponse = Depends(require_role([UserRole.BRAND]))
+):
+    query = {"brand_id": current_user.id}
+    
+    if period:
+        query["period"] = period
+    
+    if start_date and end_date:
+        query["report_date"] = {"$gte": start_date, "$lte": end_date}
+    
+    reports = await db.brand_reports.find(query, {"_id": 0}).sort("report_date", -1).to_list(1000)
+    return [BrandReport(**r) for r in reports]
+
+@api_router.get("/brand/reports/summary")
+async def get_brand_reports_summary(current_user: UserResponse = Depends(require_role([UserRole.BRAND]))):
+    """Get aggregated summary of all reports"""
+    reports = await db.brand_reports.find({"brand_id": current_user.id}, {"_id": 0}).to_list(1000)
+    
+    if not reports:
+        return {
+            "total_impressions": 0,
+            "total_clicks": 0,
+            "total_conversions": 0,
+            "total_revenue": 0.0,
+            "avg_ctr": 0.0,
+            "avg_conversion_rate": 0.0,
+            "avg_roas": 0.0,
+            "report_count": 0
+        }
+    
+    total_impressions = sum(r["metrics"]["impressions"] for r in reports)
+    total_clicks = sum(r["metrics"]["clicks"] for r in reports)
+    total_conversions = sum(r["metrics"]["conversions"] for r in reports)
+    total_revenue = sum(r["metrics"]["revenue"] for r in reports)
+    
+    avg_ctr = (total_clicks / total_impressions * 100) if total_impressions > 0 else 0
+    avg_conversion_rate = (total_conversions / total_clicks * 100) if total_clicks > 0 else 0
+    avg_roas = sum(r["metrics"]["roas"] for r in reports) / len(reports) if reports else 0
+    
+    return {
+        "total_impressions": total_impressions,
+        "total_clicks": total_clicks,
+        "total_conversions": total_conversions,
+        "total_revenue": total_revenue,
+        "avg_ctr": round(avg_ctr, 2),
+        "avg_conversion_rate": round(avg_conversion_rate, 2),
+        "avg_roas": round(avg_roas, 2),
+        "report_count": len(reports)
+    }
+
+@api_router.get("/admin/brand-reports/{brand_id}")
+async def get_brand_reports_admin(
+    brand_id: str,
+    current_user: UserResponse = Depends(require_role([UserRole.ADMIN]))
+):
+    """Admin can view any brand's reports"""
+    reports = await db.brand_reports.find({"brand_id": brand_id}, {"_id": 0}).sort("report_date", -1).to_list(1000)
+    return [BrandReport(**r) for r in reports]
 
 # ==================== CAMPAIGN ROUTES ====================
 
