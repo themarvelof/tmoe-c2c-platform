@@ -18,6 +18,7 @@ export default function DashboardLayout({ children, role }) {
       return [
         { path: '/publisher/dashboard', label: 'Dashboard', icon: ChartBar },
         { path: '/publisher/profile', label: 'Profile', icon: User },
+        { path: '/publisher/my-brands', label: 'My Brands', icon: Briefcase },
         { path: '/publisher/campaigns', label: 'Campaigns', icon: Briefcase },
         { path: '/publisher/earnings', label: 'Earnings', icon: CurrencyDollar },
       ];
@@ -25,12 +26,14 @@ export default function DashboardLayout({ children, role }) {
       return [
         { path: '/brand/dashboard', label: 'Dashboard', icon: ChartBar },
         { path: '/brand/profile', label: 'Profile', icon: User },
+        { path: '/brand/my-publishers', label: 'My Publishers', icon: User },
         { path: '/brand/campaigns', label: 'Campaigns', icon: Briefcase },
         { path: '/brand/reporting', label: 'Reports', icon: ChartBar },
       ];
     } else if (role === 'admin') {
       return [
         { path: '/admin/dashboard', label: 'Dashboard', icon: ChartBar },
+        { path: '/admin/directory', label: 'Directory', icon: User },
         { path: '/admin/users', label: 'Users', icon: User },
         { path: '/admin/campaigns', label: 'Campaigns', icon: Briefcase },
         { path: '/admin/create-brand', label: 'Create Brand', icon: User },

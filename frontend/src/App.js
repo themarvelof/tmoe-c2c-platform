@@ -8,17 +8,21 @@ import PublisherDashboard from './pages/publisher/PublisherDashboard';
 import PublisherProfile from './pages/publisher/PublisherProfile';
 import PublisherCampaigns from './pages/publisher/PublisherCampaigns';
 import PublisherEarnings from './pages/publisher/PublisherEarnings';
+import PublisherMyBrands from './pages/publisher/PublisherMyBrands';
 import BrandDashboard from './pages/brand/BrandDashboard';
 import BrandProfile from './pages/brand/BrandProfile';
 import BrandCampaigns from './pages/brand/BrandCampaigns';
+import BrandReporting from './pages/brand/BrandReporting';
+import BrandMyPublishers from './pages/brand/BrandMyPublishers';
+import BrandPublisherContent from './pages/brand/BrandPublisherContent';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import AdminUsers from './pages/admin/AdminUsers';
 import AdminCampaigns from './pages/admin/AdminCampaigns';
 import AdminBenchmarks from './pages/admin/AdminBenchmarks';
 import AdminSettlements from './pages/admin/AdminSettlements';
 import AdminCreateBrand from './pages/admin/AdminCreateBrand';
+import AdminDirectory from './pages/admin/AdminDirectory';
 import CampaignDetail from './pages/CampaignDetail';
-import BrandReporting from './pages/brand/BrandReporting';
 import { useAuth } from './hooks/useAuth';
 
 const ProtectedRoute = ({ children, allowedRoles }) => {
@@ -85,6 +89,14 @@ function App() {
               </ProtectedRoute>
             }
           />
+          <Route
+            path="/publisher/my-brands"
+            element={
+              <ProtectedRoute allowedRoles={['publisher']}>
+                <PublisherMyBrands />
+              </ProtectedRoute>
+            }
+          />
 
           {/* Brand Routes */}
           <Route
@@ -116,6 +128,22 @@ function App() {
             element={
               <ProtectedRoute allowedRoles={['brand']}>
                 <BrandReporting />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/brand/my-publishers"
+            element={
+              <ProtectedRoute allowedRoles={['brand']}>
+                <BrandMyPublishers />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/brand/publisher-content/:publisherId"
+            element={
+              <ProtectedRoute allowedRoles={['brand']}>
+                <BrandPublisherContent />
               </ProtectedRoute>
             }
           />
@@ -166,6 +194,14 @@ function App() {
             element={
               <ProtectedRoute allowedRoles={['admin']}>
                 <AdminCreateBrand />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/directory"
+            element={
+              <ProtectedRoute allowedRoles={['admin']}>
+                <AdminDirectory />
               </ProtectedRoute>
             }
           />

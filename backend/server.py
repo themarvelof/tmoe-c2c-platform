@@ -112,22 +112,26 @@ class PublisherProfile(BaseModel):
     user_id: str
     name: str
     website: str
+    logo_url: Optional[str] = None
     categories: List[str]
     description: str
     monthly_sessions: int
     monthly_pageviews: int
     content_slots: List[ContentSlot] = []
     payment_details: Optional[Dict[str, Any]] = None
+    rss_feed_url: Optional[str] = None
     created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
 class PublisherProfileCreate(BaseModel):
     name: str
     website: str
+    logo_url: Optional[str] = None
     categories: List[str]
     description: str
     monthly_sessions: int
     monthly_pageviews: int
     payment_details: Optional[Dict[str, Any]] = None
+    rss_feed_url: Optional[str] = None
 
 class ContentSlotCreate(BaseModel):
     slot_type: str
@@ -141,6 +145,7 @@ class BrandProfile(BaseModel):
     user_id: str
     company_name: str
     website: str
+    logo_url: Optional[str] = None
     industry: str
     description: str
     target_categories: List[str]
@@ -151,6 +156,7 @@ class BrandProfile(BaseModel):
 class BrandProfileCreate(BaseModel):
     company_name: str
     website: str
+    logo_url: Optional[str] = None
     industry: str
     description: str
     target_categories: List[str]
@@ -304,6 +310,34 @@ class BrandReportCreate(BaseModel):
     metrics: BrandReportMetrics
     campaign_breakdown: Optional[List[Dict[str, Any]]] = []
     custom_data: Optional[Dict[str, Any]] = {}
+
+# Content Piece Models (from RSS feeds)
+class ContentPiece(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    publisher_id: str
+    brand_id: str
+    campaign_id: Optional[str] = None
+    title: str
+    url: str
+    published_date: str
+    description: Optional[str] = None
+    image_url: Optional[str] = None
+    author: Optional[str] = None
+    source: str = "rss"  # rss, manual, api
+    created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+
+class ContentPieceCreate(BaseModel):
+    publisher_id: str
+    brand_id: str
+    campaign_id: Optional[str] = None
+    title: str
+    url: str
+    published_date: str
+    description: Optional[str] = None
+    image_url: Optional[str] = None
+    author: Optional[str] = None
+    source: str = "rss"
 
 # ==================== HELPER FUNCTIONS ====================
 
@@ -541,6 +575,37 @@ async def get_publisher_earnings(current_user: UserResponse = Depends(require_ro
         "settlements": [Settlement(**s) for s in settlements]
     }
 
+@api_router.get("/publisher/my-brands")
+async def get_publisher_brands(current_user: UserResponse = Depends(require_role([UserRole.PUBLISHER]))):
+    """Get all brands that this publisher is working with"""
+    # Find campaigns assigned to this publisher
+    campaigns = await db.campaigns.find(
+        {"assigned_publishers": current_user.id},
+        {"_id": 0}
+    ).to_list(1000)
+    
+    # Get unique brand IDs
+    brand_ids = list(set(c["assigned_brand"] for c in campaigns if c.get("assigned_brand")))
+    
+    if not brand_ids:
+        return []
+    
+    # Get brand details
+    brands = []
+    for brand_id in brand_ids:
+        user = await db.users.find_one({"id": brand_id}, {"_id": 0})
+        if user:
+            profile = await db.brand_profiles.find_one({"user_id": brand_id}, {"_id": 0})
+            brand_campaigns = [c for c in campaigns if c.get("assigned_brand") == brand_id]
+            brands.append({
+                "user": UserResponse(**user),
+                "profile": BrandProfile(**profile) if profile else None,
+                "campaigns_count": len(brand_campaigns),
+                "active_campaigns": len([c for c in brand_campaigns if c["status"] == "active"])
+            })
+    
+    return brands
+
 # ==================== BRAND ROUTES ====================
 
 @api_router.post("/brand/profile")
@@ -594,6 +659,48 @@ async def get_brand_briefs(current_user: UserResponse = Depends(require_role([Us
 async def get_brand_campaigns(current_user: UserResponse = Depends(require_role([UserRole.BRAND]))):
     campaigns = await db.campaigns.find({"assigned_brand": current_user.id}, {"_id": 0}).to_list(1000)
     return [Campaign(**c) for c in campaigns]
+
+@api_router.get("/brand/my-publishers")
+async def get_brand_publishers(current_user: UserResponse = Depends(require_role([UserRole.BRAND]))):
+    """Get all publishers assigned to this brand"""
+    # Find campaigns for this brand
+    campaigns = await db.campaigns.find(
+        {"assigned_brand": current_user.id},
+        {"_id": 0}
+    ).to_list(1000)
+    
+    # Get unique publisher IDs from all campaigns
+    publisher_ids = []
+    for campaign in campaigns:
+        publisher_ids.extend(campaign.get("assigned_publishers", []))
+    publisher_ids = list(set(publisher_ids))
+    
+    if not publisher_ids:
+        return []
+    
+    # Get publisher details
+    publishers = []
+    for pub_id in publisher_ids:
+        user = await db.users.find_one({"id": pub_id}, {"_id": 0})
+        if user:
+            profile = await db.publisher_profiles.find_one({"user_id": pub_id}, {"_id": 0})
+            pub_campaigns = [c for c in campaigns if pub_id in c.get("assigned_publishers", [])]
+            
+            # Count content pieces
+            content_count = await db.content_pieces.count_documents({
+                "publisher_id": pub_id,
+                "brand_id": current_user.id
+            })
+            
+            publishers.append({
+                "user": UserResponse(**user),
+                "profile": PublisherProfile(**profile) if profile else None,
+                "campaigns_count": len(pub_campaigns),
+                "active_campaigns": len([c for c in pub_campaigns if c["status"] == "active"]),
+                "content_pieces_count": content_count
+            })
+    
+    return publishers
 
 # ==================== BRAND REPORTING ROUTES ====================
 
@@ -846,6 +953,77 @@ async def update_settlement(
     if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="Settlement not found")
     return {"message": "Settlement updated successfully"}
+
+# ==================== CONTENT TRACKING ROUTES ====================
+
+@api_router.post("/content-pieces")
+async def create_content_piece(
+    content_data: ContentPieceCreate,
+    current_user: UserResponse = Depends(get_current_user)
+):
+    """Create a content piece - accessible by publisher, brand, or admin"""
+    content = ContentPiece(**content_data.model_dump())
+    await db.content_pieces.insert_one(content.model_dump())
+    return content
+
+@api_router.get("/brand/publishers/{publisher_id}/content")
+async def get_publisher_content_for_brand(
+    publisher_id: str,
+    current_user: UserResponse = Depends(require_role([UserRole.BRAND]))
+):
+    """Get all content pieces from a publisher about this brand"""
+    content_pieces = await db.content_pieces.find({
+        "publisher_id": publisher_id,
+        "brand_id": current_user.id
+    }, {"_id": 0}).sort("published_date", -1).to_list(1000)
+    
+    return [ContentPiece(**c) for c in content_pieces]
+
+@api_router.get("/admin/content-pieces")
+async def get_all_content_pieces(
+    publisher_id: Optional[str] = None,
+    brand_id: Optional[str] = None,
+    current_user: UserResponse = Depends(require_role([UserRole.ADMIN]))
+):
+    """Admin can view all content pieces with optional filters"""
+    query = {}
+    if publisher_id:
+        query["publisher_id"] = publisher_id
+    if brand_id:
+        query["brand_id"] = brand_id
+    
+    content_pieces = await db.content_pieces.find(query, {"_id": 0}).sort("published_date", -1).to_list(1000)
+    return [ContentPiece(**c) for c in content_pieces]
+
+@api_router.get("/admin/publishers-list")
+async def get_publishers_list(current_user: UserResponse = Depends(require_role([UserRole.ADMIN]))):
+    """Get list of all publishers with their profiles"""
+    publishers = await db.users.find({"role": UserRole.PUBLISHER}, {"_id": 0}).to_list(1000)
+    result = []
+    for pub in publishers:
+        profile = await db.publisher_profiles.find_one({"user_id": pub["id"]}, {"_id": 0})
+        campaigns_count = await db.campaigns.count_documents({"assigned_publishers": pub["id"]})
+        result.append({
+            "user": UserResponse(**pub),
+            "profile": PublisherProfile(**profile) if profile else None,
+            "campaigns_count": campaigns_count
+        })
+    return result
+
+@api_router.get("/admin/brands-list")
+async def get_brands_list(current_user: UserResponse = Depends(require_role([UserRole.ADMIN]))):
+    """Get list of all brands with their profiles"""
+    brands = await db.users.find({"role": UserRole.BRAND}, {"_id": 0}).to_list(1000)
+    result = []
+    for brand in brands:
+        profile = await db.brand_profiles.find_one({"user_id": brand["id"]}, {"_id": 0})
+        campaigns_count = await db.campaigns.count_documents({"assigned_brand": brand["id"]})
+        result.append({
+            "user": UserResponse(**brand),
+            "profile": BrandProfile(**profile) if profile else None,
+            "campaigns_count": campaigns_count
+        })
+    return result
 
 # ==================== SEED DATA ROUTE ====================
 
