@@ -9,6 +9,7 @@ import PublisherProfile from './pages/publisher/PublisherProfile';
 import PublisherCampaigns from './pages/publisher/PublisherCampaigns';
 import PublisherEarnings from './pages/publisher/PublisherEarnings';
 import PublisherMyBrands from './pages/publisher/PublisherMyBrands';
+import PublisherReports from './pages/publisher/PublisherReports';
 import BrandDashboard from './pages/brand/BrandDashboard';
 import BrandProfile from './pages/brand/BrandProfile';
 import BrandCampaigns from './pages/brand/BrandCampaigns';
@@ -22,6 +23,7 @@ import AdminBenchmarks from './pages/admin/AdminBenchmarks';
 import AdminSettlements from './pages/admin/AdminSettlements';
 import AdminCreateBrand from './pages/admin/AdminCreateBrand';
 import AdminDirectory from './pages/admin/AdminDirectory';
+import AdminReports from './pages/admin/AdminReports';
 import CampaignDetail from './pages/CampaignDetail';
 import { useAuth } from './hooks/useAuth';
 
@@ -94,6 +96,14 @@ function App() {
             element={
               <ProtectedRoute allowedRoles={['publisher']}>
                 <PublisherMyBrands />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/publisher/reports"
+            element={
+              <ProtectedRoute allowedRoles={['publisher']}>
+                <PublisherReports />
               </ProtectedRoute>
             }
           />
@@ -202,6 +212,14 @@ function App() {
             element={
               <ProtectedRoute allowedRoles={['admin']}>
                 <AdminDirectory />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/reports"
+            element={
+              <ProtectedRoute allowedRoles={['admin']}>
+                <AdminReports />
               </ProtectedRoute>
             }
           />

@@ -1,10 +1,13 @@
-from fastapi import FastAPI, APIRouter, HTTPException, Depends, status
+from fastapi import FastAPI, APIRouter, HTTPException, Depends, status, UploadFile, File, Form
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 import os
 import logging
+import csv
+import io
+import openpyxl
 from pathlib import Path
 from pydantic import BaseModel, Field, ConfigDict, EmailStr
 from typing import List, Optional, Dict, Any
@@ -301,6 +304,9 @@ class BrandReport(BaseModel):
     metrics: BrandReportMetrics
     campaign_breakdown: Optional[List[Dict[str, Any]]] = []
     custom_data: Optional[Dict[str, Any]] = {}
+    csv_columns: Optional[List[str]] = []
+    csv_rows: Optional[List[Dict[str, Any]]] = []
+    filename: Optional[str] = ""
     created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
 class BrandReportCreate(BaseModel):
@@ -606,6 +612,114 @@ async def get_publisher_brands(current_user: UserResponse = Depends(require_role
     
     return brands
 
+@api_router.get("/publisher/brand-reports")
+async def get_publisher_brand_reports(current_user: UserResponse = Depends(require_role([UserRole.PUBLISHER]))):
+    """Get reports for all brands this publisher works with, grouped by brand"""
+    campaigns = await db.campaigns.find(
+        {"assigned_publishers": current_user.id}, {"_id": 0}
+    ).to_list(1000)
+    brand_ids = list(set(c["assigned_brand"] for c in campaigns if c.get("assigned_brand")))
+    if not brand_ids:
+        return []
+
+    result = []
+    for brand_id in brand_ids:
+        brand_user = await db.users.find_one({"id": brand_id}, {"_id": 0})
+        if not brand_user:
+            continue
+        reports = await db.brand_reports.find(
+            {"brand_id": brand_id}, {"_id": 0}
+        ).sort("report_date", -1).to_list(100)
+
+        total_impr = sum(r["metrics"]["impressions"] for r in reports)
+        total_clicks = sum(r["metrics"]["clicks"] for r in reports)
+        total_conv = sum(r["metrics"]["conversions"] for r in reports)
+        total_rev = sum(r["metrics"]["revenue"] for r in reports)
+
+        result.append({
+            "brand": UserResponse(**brand_user),
+            "report_count": len(reports),
+            "summary": {
+                "total_impressions": total_impr,
+                "total_clicks": total_clicks,
+                "total_conversions": total_conv,
+                "total_revenue": round(total_rev, 2),
+                "avg_ctr": round(total_clicks / total_impr * 100, 2) if total_impr > 0 else 0,
+            },
+            "reports": [BrandReport(**r) for r in reports[:30]]
+        })
+    return result
+
+@api_router.get("/admin/all-brand-reports")
+async def get_all_brand_reports_admin(current_user: UserResponse = Depends(require_role([UserRole.ADMIN]))):
+    """Admin gets reports for all brands"""
+    brands = await db.users.find({"role": "brand"}, {"_id": 0}).to_list(1000)
+    result = []
+    for brand_user in brands:
+        brand_id = brand_user["id"]
+        reports = await db.brand_reports.find(
+            {"brand_id": brand_id}, {"_id": 0}
+        ).sort("report_date", -1).to_list(100)
+
+        total_impr = sum(r["metrics"]["impressions"] for r in reports)
+        total_clicks = sum(r["metrics"]["clicks"] for r in reports)
+        total_conv = sum(r["metrics"]["conversions"] for r in reports)
+        total_rev = sum(r["metrics"]["revenue"] for r in reports)
+
+        result.append({
+            "brand": UserResponse(**brand_user),
+            "report_count": len(reports),
+            "summary": {
+                "total_impressions": total_impr,
+                "total_clicks": total_clicks,
+                "total_conversions": total_conv,
+                "total_revenue": round(total_rev, 2),
+                "avg_ctr": round(total_clicks / total_impr * 100, 2) if total_impr > 0 else 0,
+            },
+            "reports": [BrandReport(**r) for r in reports[:30]]
+        })
+    return result
+
+@api_router.post("/admin/brand-reports/{brand_id}/upload-csv")
+async def admin_upload_for_brand(
+    brand_id: str,
+    file: UploadFile = File(...),
+    current_user: UserResponse = Depends(require_role([UserRole.ADMIN]))
+):
+    """Admin can upload CSV/XLS/XLSX reports for any brand"""
+    brand = await db.users.find_one({"id": brand_id, "role": "brand"}, {"_id": 0})
+    if not brand:
+        raise HTTPException(status_code=404, detail="Brand not found")
+    if not any(file.filename.lower().endswith(ext) for ext in ALLOWED_EXTENSIONS):
+        raise HTTPException(status_code=400, detail="Accepted formats: CSV, XLS, XLSX")
+
+    content = await file.read()
+    original_columns, csv_rows = parse_spreadsheet(content, file.filename)
+    if not csv_rows:
+        raise HTTPException(status_code=400, detail="File is empty or could not be parsed")
+
+    metrics = extract_metrics_from_rows(csv_rows)
+
+    report = BrandReport(
+        brand_id=brand_id,
+        report_date=datetime.now(timezone.utc).strftime('%Y-%m-%d'),
+        period="daily",
+        metrics=metrics,
+        campaign_breakdown=[],
+        custom_data={"source": "admin_file_upload"},
+        csv_columns=original_columns,
+        csv_rows=csv_rows,
+        filename=file.filename
+    )
+    await db.brand_reports.insert_one(report.model_dump())
+
+    return {
+        "message": f"Successfully imported report: {file.filename} ({len(csv_rows)} rows) for {brand['email']}",
+        "report_id": report.id,
+        "brand_email": brand["email"],
+        "row_count": len(csv_rows)
+    }
+
 # ==================== BRAND ROUTES ====================
 
 @api_router.post("/brand/profile")
@@ -800,6 +914,133 @@ async def get_brand_reports_admin(
     """Admin can view any brand's reports"""
     reports = await db.brand_reports.find({"brand_id": brand_id}, {"_id": 0}).sort("report_date", -1).to_list(1000)
     return [BrandReport(**r) for r in reports]
+
+def parse_spreadsheet(content: bytes, filename: str):
+    """Parse CSV or XLS/XLSX file and return columns + rows"""
+    ext = filename.lower().rsplit('.', 1)[-1] if '.' in filename else ''
+
+    if ext == 'csv':
+        try:
+            text = content.decode('utf-8')
+        except UnicodeDecodeError:
+            text = content.decode('latin-1')
+        reader = csv.DictReader(io.StringIO(text))
+        original_columns = [c.strip() for c in (reader.fieldnames or [])]
+        rows = list(reader)
+        csv_rows = [{k.strip(): str(v).strip() for k, v in row.items()} for row in rows]
+
+    elif ext in ('xls', 'xlsx'):
+        wb = openpyxl.load_workbook(io.BytesIO(content), read_only=True, data_only=True)
+        ws = wb.active
+        all_rows = list(ws.iter_rows(values_only=True))
+        if not all_rows:
+            return [], []
+        original_columns = [str(c).strip() if c is not None else f'Column_{i}' for i, c in enumerate(all_rows[0])]
+        csv_rows = []
+        for row in all_rows[1:]:
+            row_dict = {}
+            for i, col in enumerate(original_columns):
+                val = row[i] if i < len(row) else None
+                row_dict[col] = str(val).strip() if val is not None else ''
+            csv_rows.append(row_dict)
+        wb.close()
+    else:
+        return [], []
+
+    return original_columns, csv_rows
+
+def extract_metrics_from_rows(csv_rows):
+    """Extract summary metrics from row data"""
+    def get_num(row, keys, default=0):
+        for k in keys:
+            lk = k.lower().replace(' ', '_')
+            for rk, rv in row.items():
+                if rk.lower().replace(' ', '_') == lk and rv:
+                    try:
+                        return float(str(rv).replace(',', '').replace('$', '').replace('%', ''))
+                    except ValueError:
+                        pass
+        return default
+
+    total_impressions = 0
+    total_clicks = 0
+    total_conversions = 0
+    total_revenue = 0.0
+
+    for row in csv_rows:
+        total_impressions += int(get_num(row, ['impressions', 'impr', 'views', 'total_impressions']))
+        total_clicks += int(get_num(row, ['clicks', 'total_clicks', 'click']))
+        total_conversions += int(get_num(row, ['conversions', 'conv', 'actions', 'orders']))
+        total_revenue += get_num(row, ['revenue', 'total_revenue', 'total_earnings', 'sales', 'earnings', 'amount', 'sale_amount'])
+
+    return BrandReportMetrics(
+        impressions=total_impressions,
+        clicks=total_clicks,
+        conversions=total_conversions,
+        revenue=round(total_revenue, 2),
+        ctr=round(total_clicks / total_impressions * 100, 2) if total_impressions > 0 else 0,
+        conversion_rate=round(total_conversions / total_clicks * 100, 2) if total_clicks > 0 else 0,
+        cost_per_click=round(total_revenue / total_clicks, 2) if total_clicks > 0 else 0,
+        roas=round(total_revenue / (total_revenue * 0.1), 2) if total_revenue > 0 else 0
+    )
+
+ALLOWED_EXTENSIONS = ('.csv', '.xls', '.xlsx')
+
+@api_router.post("/brand/reports/upload-csv")
+async def upload_report(
+    file: UploadFile = File(...),
+    current_user: UserResponse = Depends(require_role([UserRole.BRAND]))
+):
+    """Upload a CSV or XLS/XLSX report file"""
+    if not any(file.filename.lower().endswith(ext) for ext in ALLOWED_EXTENSIONS):
+        raise HTTPException(status_code=400, detail="Accepted formats: CSV, XLS, XLSX")
+
+    content = await file.read()
+    original_columns, csv_rows = parse_spreadsheet(content, file.filename)
+
+    if not csv_rows:
+        raise HTTPException(status_code=400, detail="File is empty or could not be parsed")
+
+    metrics = extract_metrics_from_rows(csv_rows)
+
+    report = BrandReport(
+        brand_id=current_user.id,
+        report_date=datetime.now(timezone.utc).strftime('%Y-%m-%d'),
+        period="daily",
+        metrics=metrics,
+        campaign_breakdown=[],
+        custom_data={"source": "file_upload"},
+        csv_columns=original_columns,
+        csv_rows=csv_rows,
+        filename=file.filename
+    )
+
+    await db.brand_reports.insert_one(report.model_dump())
+
+    return {
+        "message": f"Successfully imported report: {file.filename} ({len(csv_rows)} rows)",
+        "report_id": report.id,
+        "filename": file.filename,
+        "columns": original_columns,
+        "row_count": len(csv_rows)
+    }
+
+@api_router.delete("/brand/reports/{report_id}")
+async def delete_brand_report(
+    report_id: str,
+    current_user: UserResponse = Depends(require_role([UserRole.BRAND]))
+):
+    result = await db.brand_reports.delete_one({"id": report_id, "brand_id": current_user.id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Report not found")
+    return {"message": "Report deleted"}
+
+@api_router.delete("/brand/reports")
+async def delete_all_brand_reports(
+    current_user: UserResponse = Depends(require_role([UserRole.BRAND]))
+):
+    result = await db.brand_reports.delete_many({"brand_id": current_user.id})
+    return {"message": f"Deleted {result.deleted_count} reports"}
 
 # ==================== CAMPAIGN ROUTES ====================
 
@@ -1214,6 +1455,42 @@ async def startup_seed():
             await db.campaigns.insert_one(campaign.model_dump())
             logger.info("Seeded campaign: Amazon TMOE x Marvel of Everything")
 
+        # 4b. Seed Skyscanner Brand
+        sky_doc = await db.users.find_one({"email": "skyscanner@gmail.com"}, {"_id": 0})
+        if not sky_doc:
+            sky_user = User(
+                email="skyscanner@gmail.com",
+                password_hash=pwd_context.hash("Skyscanner@123"),
+                role=UserRole.BRAND,
+                status=UserStatus.APPROVED,
+                company_name="Skyscanner",
+                website="https://skyscanner.com"
+            )
+            await db.users.insert_one(sky_user.model_dump())
+            sky_doc = sky_user.model_dump()
+            logger.info("Seeded brand skyscanner@gmail.com")
+
+        sky_id = sky_doc["id"]
+
+        # 5b. Seed Campaign linking Skyscanner and publisher
+        if not await db.campaigns.find_one({"assigned_brand": sky_id, "assigned_publishers": pub_id}):
+            sky_campaign = Campaign(
+                name="Skyscanner x Marvel of Everything",
+                category="Travel",
+                target_markets=["India", "Global"],
+                assigned_publishers=[pub_id],
+                assigned_brand=sky_id,
+                content_type="Travel Guides & Deals",
+                content_budget=30000.0,
+                distribution_budget=20000.0,
+                commerce_links=["https://skyscanner.com"],
+                status=CampaignStatus.ACTIVE,
+                start_date="2026-03-01",
+                end_date="2026-06-30"
+            )
+            await db.campaigns.insert_one(sky_campaign.model_dump())
+            logger.info("Seeded campaign: Skyscanner x Marvel of Everything")
+
         # 6. Seed Amazon-related articles from marvelof.com
         existing_count = await db.content_pieces.count_documents({"brand_id": brand_id, "publisher_id": pub_id})
         if existing_count == 0:
@@ -1315,6 +1592,39 @@ async def startup_seed():
             for b in benchmarks:
                 await db.roi_benchmarks.insert_one(ROIBenchmark(**b).model_dump())
             logger.info("Seeded default ROI benchmarks")
+
+        # 8. Seed sample report data for Amazon TMOE brand
+        existing_reports = await db.brand_reports.count_documents({"brand_id": brand_id})
+        if existing_reports == 0:
+            import random
+            sample_reports = []
+            base_date = datetime(2026, 3, 1, tzinfo=timezone.utc)
+            campaigns = ["Amazon Gadgets", "Amazon Fashion", "Amazon Home"]
+            for i in range(30):
+                day = base_date + timedelta(days=i)
+                camp = campaigns[i % 3]
+                impr = random.randint(8000, 25000)
+                clicks = random.randint(int(impr * 0.03), int(impr * 0.08))
+                convs = random.randint(int(clicks * 0.04), int(clicks * 0.12))
+                rev = round(convs * random.uniform(80, 200), 2)
+                ctr = round(clicks / impr * 100, 2)
+                conv_rate = round(convs / clicks * 100, 2) if clicks > 0 else 0
+                roas = round(rev / (rev * 0.1), 2) if rev > 0 else 0
+                report = BrandReport(
+                    brand_id=brand_id,
+                    report_date=day.strftime('%Y-%m-%d'),
+                    period="daily",
+                    metrics=BrandReportMetrics(
+                        impressions=impr, clicks=clicks, conversions=convs,
+                        revenue=rev, ctr=ctr, conversion_rate=conv_rate,
+                        cost_per_click=round(rev / clicks, 2) if clicks > 0 else 0, roas=roas
+                    ),
+                    campaign_breakdown=[{"campaign": camp}],
+                    custom_data={"source": "seed"}
+                )
+                sample_reports.append(report.model_dump())
+            await db.brand_reports.insert_many(sample_reports)
+            logger.info(f"Seeded {len(sample_reports)} sample reports for Amazon TMOE")
 
         logger.info("Startup seed complete")
     except Exception as e:

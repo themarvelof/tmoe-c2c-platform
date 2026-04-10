@@ -1,7 +1,7 @@
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
-import { SignOut, ChartBar, User, Briefcase, CurrencyDollar, GearSix } from '@phosphor-icons/react';
+import { SignOut, ChartBar, User, Briefcase, CurrencyDollar, GearSix, FileText } from '@phosphor-icons/react';
 
 export default function DashboardLayout({ children, role }) {
   const navigate = useNavigate();
@@ -20,6 +20,7 @@ export default function DashboardLayout({ children, role }) {
         { path: '/publisher/profile', label: 'Profile', icon: User },
         { path: '/publisher/my-brands', label: 'My Brands', icon: Briefcase },
         { path: '/publisher/campaigns', label: 'Campaigns', icon: Briefcase },
+        { path: '/publisher/reports', label: 'Reports', icon: FileText },
         { path: '/publisher/earnings', label: 'Earnings', icon: CurrencyDollar },
       ];
     } else if (role === 'brand') {
@@ -28,7 +29,7 @@ export default function DashboardLayout({ children, role }) {
         { path: '/brand/profile', label: 'Profile', icon: User },
         { path: '/brand/my-publishers', label: 'My Publishers', icon: User },
         { path: '/brand/campaigns', label: 'Campaigns', icon: Briefcase },
-        { path: '/brand/reporting', label: 'Reports', icon: ChartBar },
+        { path: '/brand/reporting', label: 'Reports', icon: FileText },
       ];
     } else if (role === 'admin') {
       return [
@@ -36,6 +37,7 @@ export default function DashboardLayout({ children, role }) {
         { path: '/admin/directory', label: 'Directory', icon: User },
         { path: '/admin/users', label: 'Users', icon: User },
         { path: '/admin/campaigns', label: 'Campaigns', icon: Briefcase },
+        { path: '/admin/reports', label: 'Reports', icon: FileText },
         { path: '/admin/create-brand', label: 'Create Brand', icon: User },
         { path: '/admin/benchmarks', label: 'Benchmarks', icon: GearSix },
         { path: '/admin/settlements', label: 'Settlements', icon: CurrencyDollar },
