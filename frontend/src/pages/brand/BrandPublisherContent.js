@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import DashboardLayout from '@/components/DashboardLayout';
 import axios from '@/utils/api';
@@ -14,11 +14,7 @@ export default function BrandPublisherContent() {
   const [publisherInfo, setPublisherInfo] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    fetchContent();
-  }, [publisherId]);
-
-  const fetchContent = async () => {
+  const fetchContent = useCallback(async () => {
     try {
       const response = await axios.get(`${API}/brand/publishers/${publisherId}/content`);
       setContent(response.data);
@@ -32,7 +28,11 @@ export default function BrandPublisherContent() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [publisherId]);
+
+  useEffect(() => {
+    fetchContent();
+  }, [fetchContent]);
 
   if (loading) {
     return (

@@ -26,7 +26,7 @@ export default function BrandReporting() {
 
   useEffect(() => { fetchData(); }, []);
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
       const res = await axios.get(`${API}/brand/reports`);
       setReports(res.data);
@@ -35,9 +35,9 @@ export default function BrandReporting() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  const processFile = async (file) => {
+  const processFile = useCallback(async (file) => {
     const allowed = ['.csv', '.xls', '.xlsx'];
     if (!allowed.some(ext => file.name.toLowerCase().endsWith(ext))) {
       toast.error('Please upload a CSV or XLS/XLSX file');
@@ -57,7 +57,7 @@ export default function BrandReporting() {
     } finally {
       setUploading(false);
     }
-  };
+  }, [fetchData]);
 
   const handleFileUpload = (e) => {
     const file = e.target.files[0];
@@ -70,7 +70,7 @@ export default function BrandReporting() {
     e.stopPropagation();
     if (e.type === 'dragenter' || e.type === 'dragover') setDragActive(true);
     else if (e.type === 'dragleave') setDragActive(false);
-  }, []);
+  }, [processFile]);
 
   const handleDrop = useCallback((e) => {
     e.preventDefault();

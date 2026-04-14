@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import DashboardLayout from '@/components/DashboardLayout';
 import { useAuth } from '@/hooks/useAuth';
@@ -15,11 +15,7 @@ export default function CampaignDetail() {
   const [campaign, setCampaign] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    fetchCampaign();
-  }, [campaignId]);
-
-  const fetchCampaign = async () => {
+  const fetchCampaign = useCallback(async () => {
     try {
       const response = await axios.get(`${API}/campaigns/${campaignId}`);
       setCampaign(response.data);
@@ -29,7 +25,11 @@ export default function CampaignDetail() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [campaignId, navigate]);
+
+  useEffect(() => {
+    fetchCampaign();
+  }, [fetchCampaign]);
 
   if (loading) {
     return (
