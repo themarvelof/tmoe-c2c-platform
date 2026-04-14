@@ -4,9 +4,11 @@ from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 import os
+import re
 import logging
 import csv
 import io
+import json
 import openpyxl
 from pathlib import Path
 from pydantic import BaseModel, Field, ConfigDict, EmailStr
@@ -15,6 +17,10 @@ import uuid
 from datetime import datetime, timezone, timedelta
 import jwt
 from passlib.context import CryptContext
+import httpx
+
+import impact_export
+from services import impact_service
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -154,6 +160,9 @@ class BrandProfile(BaseModel):
     target_categories: List[str]
     target_markets: List[str]
     commerce_links: List[str] = []
+    impact_program_sub_id: Optional[str] = None
+    impact_report_handle: Optional[str] = None
+    impact_campaign_names: Optional[List[str]] = []
     created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
 class BrandProfileCreate(BaseModel):
@@ -165,6 +174,9 @@ class BrandProfileCreate(BaseModel):
     target_categories: List[str]
     target_markets: List[str]
     commerce_links: List[str] = []
+    impact_program_sub_id: Optional[str] = None
+    impact_report_handle: Optional[str] = None
+    impact_campaign_names: Optional[List[str]] = []
 
 # Campaign Brief Models
 class CampaignBrief(BaseModel):
@@ -317,6 +329,27 @@ class BrandReportCreate(BaseModel):
     campaign_breakdown: Optional[List[Dict[str, Any]]] = []
     custom_data: Optional[Dict[str, Any]] = {}
 
+class AdminBrandImpactConfig(BaseModel):
+    impact_program_sub_id: Optional[str] = None
+    impact_report_handle: Optional[str] = None
+    impact_campaign_names: Optional[List[str]] = None
+
+class AdminImpactImportBody(BaseModel):
+    start_date: str
+    end_date: str
+    report_handle: Optional[str] = None
+    program_sub_id: Optional[str] = None
+    replace_matching_range: bool = True
+
+class AdminImpactSyncAllBody(BaseModel):
+    start_date: str
+    end_date: str
+    replace_matching_range: bool = True
+
+class AdminImpactSyncWindowBody(BaseModel):
+    days: int = 10
+    replace_matching_range: bool = True
+
 # Content Piece Models (from RSS feeds)
 class ContentPiece(BaseModel):
     model_config = ConfigDict(extra="ignore")
@@ -374,6 +407,35 @@ def require_role(required_roles: List[str]):
             raise HTTPException(status_code=403, detail="Insufficient permissions")
         return current_user
     return role_checker
+
+def _impact_credentials_configured() -> bool:
+    sid = (os.environ.get("IMPACT_ACCOUNT_SID") or "").strip()
+    tok = (os.environ.get("IMPACT_AUTH_TOKEN") or "").strip()
+    return bool(sid and tok)
+
+def _resolve_impact_sub_aid(
+    profile: Optional[Dict[str, Any]],
+    program_sub_id: Optional[str],
+) -> Optional[str]:
+    if program_sub_id and str(program_sub_id).strip():
+        return str(program_sub_id).strip()
+    if profile and profile.get("impact_program_sub_id"):
+        v = profile.get("impact_program_sub_id")
+        if v is not None and str(v).strip():
+            return str(v).strip()
+    env = os.environ.get("IMPACT_SUBAID") or os.environ.get("IMPACT_SUB_AID")
+    if env and str(env).strip():
+        return str(env).strip()
+    return None
+
+def _resolve_impact_report_handle(profile: Optional[Dict[str, Any]], override: Optional[str]) -> str:
+    if override and str(override).strip():
+        return str(override).strip()
+    if profile and profile.get("impact_report_handle"):
+        v = profile.get("impact_report_handle")
+        if v is not None and str(v).strip():
+            return str(v).strip()
+    return (os.environ.get("IMPACT_REPORT_HANDLE") or "partner_performance_by_program").strip()
 
 # ==================== AUTH ROUTES ====================
 
@@ -507,6 +569,110 @@ async def get_dashboard_stats(current_user: UserResponse = Depends(require_role(
         "total_brands": total_brands,
         "total_gmv": total_gmv
     }
+
+
+@api_router.get("/reports")
+async def get_impact_reports(
+    start_date: str,
+    end_date: str,
+    current_user: UserResponse = Depends(require_role([UserRole.ADMIN])),
+):
+    """Fetch Impact Reports API data and return summary/daily/table for dashboard."""
+    try:
+        start_obj = datetime.strptime(start_date.strip(), "%Y-%m-%d").date()
+        end_obj = datetime.strptime(end_date.strip(), "%Y-%m-%d").date()
+    except ValueError:
+        raise HTTPException(status_code=400, detail="start_date and end_date must be YYYY-MM-DD")
+    if end_obj < start_obj:
+        raise HTTPException(status_code=400, detail="end_date must be on or after start_date")
+
+    try:
+        program_rows = await impact_service.get_program_report(start_date.strip(), end_date.strip())
+        daily_rows = await impact_service.get_daily_report(start_date.strip(), end_date.strip())
+    except ValueError as exc:
+        raise HTTPException(status_code=503, detail=str(exc))
+    except httpx.HTTPStatusError as exc:
+        detail = exc.response.text[:500] if exc.response is not None else str(exc)
+        raise HTTPException(status_code=502, detail=f"Impact API error: {detail}")
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch reports: {exc}")
+
+    records = [
+        {
+            "Campaign": str(row.get("campaign") or "Unknown").strip(),
+            "Clicks": int(row.get("clicks", 0)),
+            "Actions": int(row.get("actions", 0)),
+            "Sale_Amount": round(float(row.get("revenue", 0.0)), 2),
+        }
+        for row in program_rows
+    ]
+
+    # Aggregate campaigns in case API returns repeated campaign rows.
+    summary_map: Dict[str, Dict[str, Any]] = {}
+    for row in records:
+        campaign = str(row.get("Campaign") or "Unknown").strip()
+        if campaign not in summary_map:
+            summary_map[campaign] = {"campaign": campaign, "clicks": 0, "actions": 0, "revenue": 0.0}
+        summary_map[campaign]["clicks"] += int(row.get("Clicks", 0))
+        summary_map[campaign]["actions"] += int(row.get("Actions", 0))
+        summary_map[campaign]["revenue"] += float(row.get("Sale_Amount", 0.0))
+
+    summary = sorted(
+        (
+            {
+                "campaign": v["campaign"],
+                "clicks": int(v["clicks"]),
+                "actions": int(v["actions"]),
+                "revenue": round(float(v["revenue"]), 2),
+            }
+            for v in summary_map.values()
+        ),
+        key=lambda x: x["revenue"],
+        reverse=True,
+    )
+
+    daily = sorted(
+        [
+            {
+                "date": str(row.get("date", ""))[:10],
+                "clicks": int(row.get("clicks", 0)),
+                "actions": int(row.get("actions", 0)),
+                "revenue": round(float(row.get("revenue", 0.0)), 2),
+                "impressions": int(row.get("impressions", 0)),
+            }
+            for row in daily_rows
+            if row.get("date")
+        ],
+        key=lambda x: x["date"],
+    )
+
+    total_revenue = sum(item["revenue"] for item in summary)
+    count = len(summary)
+    if count == 0:
+        return {"summary": [], "daily": daily, "table": [], "records": []}
+
+    if total_revenue > 0:
+        ratios = {item["campaign"]: item["revenue"] / total_revenue for item in summary}
+    else:
+        equal = 1.0 / count
+        ratios = {item["campaign"]: equal for item in summary}
+
+    table = []
+    for d in daily:
+        for item in summary:
+            ratio = ratios[item["campaign"]]
+            table.append(
+                {
+                    "date": d["date"],
+                    "campaign": item["campaign"],
+                    "clicks": int(round(d["clicks"] * ratio)),
+                    "conversions": int(round(d["actions"] * ratio)),
+                    "revenue": round(d["revenue"] * ratio, 2),
+                    "impressions": int(round(d["impressions"] * ratio)),
+                }
+            )
+
+    return {"summary": summary, "daily": daily, "table": table, "records": records}
 
 # ==================== PUBLISHER ROUTES ====================
 
@@ -655,16 +821,21 @@ async def get_all_brand_reports_admin(current_user: UserResponse = Depends(requi
     """Admin gets reports for all brands"""
     brands = await db.users.find({"role": "brand"}, {"_id": 0}).to_list(1000)
     result = []
+    creds_ok = _impact_credentials_configured()
     for brand_user in brands:
         brand_id = brand_user["id"]
         reports = await db.brand_reports.find(
             {"brand_id": brand_id}, {"_id": 0}
-        ).sort("report_date", -1).to_list(100)
+        ).sort("report_date", -1).to_list(500)
 
         total_impr = sum(r["metrics"]["impressions"] for r in reports)
         total_clicks = sum(r["metrics"]["clicks"] for r in reports)
         total_conv = sum(r["metrics"]["conversions"] for r in reports)
         total_rev = sum(r["metrics"]["revenue"] for r in reports)
+
+        profile = await db.brand_profiles.find_one({"user_id": brand_id}, {"_id": 0})
+        sub_aid = _resolve_impact_sub_aid(profile, None)
+        impact_import_available = creds_ok and bool(sub_aid)
 
         result.append({
             "brand": UserResponse(**brand_user),
@@ -676,7 +847,8 @@ async def get_all_brand_reports_admin(current_user: UserResponse = Depends(requi
                 "total_revenue": round(total_rev, 2),
                 "avg_ctr": round(total_clicks / total_impr * 100, 2) if total_impr > 0 else 0,
             },
-            "reports": [BrandReport(**r) for r in reports[:30]]
+            "reports": [BrandReport(**r) for r in reports],
+            "impact_import_available": impact_import_available,
         })
     return result
 
@@ -720,6 +892,181 @@ async def admin_upload_for_brand(
         "row_count": len(csv_rows)
     }
 
+@api_router.patch("/admin/brands/{brand_id}/impact-config")
+async def admin_update_brand_impact_config(
+    brand_id: str,
+    body: AdminBrandImpactConfig,
+    current_user: UserResponse = Depends(require_role([UserRole.ADMIN]))
+):
+    """Set impact.com program (SUBAID) and optional report handle for a brand."""
+    brand = await db.users.find_one({"id": brand_id, "role": "brand"}, {"_id": 0})
+    if not brand:
+        raise HTTPException(status_code=404, detail="Brand not found")
+    patch_raw = body.model_dump(exclude_unset=True)
+    patch: Dict[str, Any] = {}
+    for k, v in patch_raw.items():
+        if k == "impact_campaign_names":
+            if isinstance(v, list):
+                cleaned = []
+                seen = set()
+                for item in v:
+                    s = str(item).strip()
+                    if s and s not in seen:
+                        seen.add(s)
+                        cleaned.append(s)
+                patch[k] = cleaned
+            continue
+        if v is None:
+            continue
+        s = str(v).strip()
+        if s:
+            patch[k] = s
+    if not patch:
+        raise HTTPException(status_code=400, detail="No fields to update")
+    result = await db.brand_profiles.update_one({"user_id": brand_id}, {"$set": patch})
+    if result.matched_count == 0:
+        raise HTTPException(
+            status_code=404,
+            detail="Brand profile not found. Create a profile for this brand before saving Impact settings.",
+        )
+    return {"message": "Impact settings updated"}
+
+@api_router.post("/admin/brand-reports/{brand_id}/import-impact")
+async def admin_import_impact_report(
+    brand_id: str,
+    body: AdminImpactImportBody,
+    current_user: UserResponse = Depends(require_role([UserRole.ADMIN]))
+):
+    """Pull impact.com ReportExport and store one legacy performance row per program (dashboard table)."""
+    result = await _impact_download_legacy_rows(
+        brand_id,
+        body.start_date.strip(),
+        body.end_date.strip(),
+        body.program_sub_id,
+        body.report_handle,
+        body.replace_matching_range,
+    )
+    if not result["ok"]:
+        err = result["error"]
+        code = 502
+        if err == "Brand not found":
+            code = 404
+        elif "YYYY-MM-DD" in err or "end_date must" in err:
+            code = 400
+        elif "SUBAID" in err or "program id" in err.lower():
+            code = 400
+        elif "not configured" in err:
+            code = 503
+        raise HTTPException(status_code=code, detail=err)
+
+    return {
+        "message": f"Imported {result['rows']} Impact program row(s) into the performance table for {result['brand_email']}",
+        "brand_email": result["brand_email"],
+        "row_count": result["rows"],
+        "report_handle": result.get("report_handle_used"),
+        "impact": result.get("meta"),
+    }
+
+@api_router.post("/admin/impact-sync-all-brands")
+async def admin_impact_sync_all_brands(
+    body: AdminImpactSyncAllBody,
+    current_user: UserResponse = Depends(require_role([UserRole.ADMIN]))
+):
+    """Run Impact ReportExport for every brand with credentials; rows are split by campaign/brand name."""
+    creds_ok = _impact_credentials_configured()
+    brands = await db.users.find({"role": "brand"}, {"_id": 0}).to_list(1000)
+    results: List[Dict[str, Any]] = []
+    total_rows = 0
+    for bu in brands:
+        bid = bu["id"]
+        if not creds_ok:
+            results.append({
+                "brand_id": bid,
+                "email": bu.get("email"),
+                "skipped": True,
+                "reason": "missing Impact credentials",
+            })
+            continue
+        r = await _impact_download_legacy_rows(
+            bid,
+            body.start_date.strip(),
+            body.end_date.strip(),
+            None,
+            None,
+            body.replace_matching_range,
+        )
+        if r.get("ok"):
+            total_rows += r["rows"]
+            results.append({
+                "brand_id": bid,
+                "email": bu.get("email"),
+                "skipped": False,
+                "rows": r["rows"],
+                "report_handle": r.get("report_handle_used"),
+            })
+        else:
+            results.append({
+                "brand_id": bid,
+                "email": bu.get("email"),
+                "skipped": False,
+                "rows": 0,
+                "error": r.get("error"),
+            })
+    return {
+        "message": f"Impact sync finished; {total_rows} program row(s) imported across brands.",
+        "total_rows": total_rows,
+        "results": results,
+    }
+
+@api_router.post("/admin/impact-sync-last-10-days")
+async def admin_impact_sync_last_10_days(
+    body: AdminImpactSyncWindowBody,
+    current_user: UserResponse = Depends(require_role([UserRole.ADMIN]))
+):
+    """
+    Daily sync window: for each brand, pull Impact rows day-by-day for last N days.
+    Keeps historical days and updates the same day on re-sync.
+    """
+    days = max(1, min(int(body.days or 10), 30))
+    today = datetime.now(timezone.utc).date()
+    day_list = [(today - timedelta(days=(days - 1 - i))).isoformat() for i in range(days)]
+
+    brands = await db.users.find({"role": "brand"}, {"_id": 0}).to_list(1000)
+    total_rows = 0
+    details: List[Dict[str, Any]] = []
+
+    for bu in brands:
+        bid = bu["id"]
+        imported = 0
+        errors: List[Dict[str, str]] = []
+        for d in day_list:
+            r = await _impact_download_legacy_rows(
+                bid,
+                d,
+                d,
+                None,
+                None,
+                body.replace_matching_range,
+            )
+            if r.get("ok"):
+                imported += int(r.get("rows", 0))
+            else:
+                errors.append({"date": d, "error": str(r.get("error", "unknown error"))})
+        total_rows += imported
+        details.append({
+            "brand_id": bid,
+            "email": bu.get("email"),
+            "rows_imported": imported,
+            "errors": errors[:5],
+        })
+
+    return {
+        "message": f"Daily Impact sync complete for last {days} day(s). Imported {total_rows} row(s).",
+        "days": days,
+        "total_rows": total_rows,
+        "details": details,
+    }
+
 # ==================== BRAND ROUTES ====================
 
 @api_router.post("/brand/profile")
@@ -731,7 +1078,7 @@ async def create_brand_profile(
     if existing:
         raise HTTPException(status_code=400, detail="Profile already exists")
     
-    profile = BrandProfile(user_id=current_user.id, **profile_data.model_dump())
+    profile = BrandProfile(user_id=current_user.id, **profile_data.model_dump(exclude_unset=True))
     await db.brand_profiles.insert_one(profile.model_dump())
     return profile
 
@@ -749,7 +1096,7 @@ async def update_brand_profile(
 ):
     result = await db.brand_profiles.update_one(
         {"user_id": current_user.id},
-        {"$set": profile_data.model_dump()}
+        {"$set": profile_data.model_dump(exclude_unset=True)}
     )
     if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="Profile not found")
@@ -915,6 +1262,64 @@ async def get_brand_reports_admin(
     reports = await db.brand_reports.find({"brand_id": brand_id}, {"_id": 0}).sort("report_date", -1).to_list(1000)
     return [BrandReport(**r) for r in reports]
 
+def _norm_header_token(value) -> str:
+    if value is None:
+        return ''
+    return str(value).strip().lower().replace(' ', '_').replace('-', '_').lstrip('\ufeff')
+
+def _row_cells_normalized(row) -> List[str]:
+    return [_norm_header_token(c) for c in row] if row else []
+
+def _looks_like_data_table_header(norm_cells: List[str]) -> bool:
+    """True when row looks like impact.com / affiliate export column headers (not a title row)."""
+    non_empty = [c for c in norm_cells if c]
+    if len(non_empty) < 3:
+        return False
+    joined = ' '.join(non_empty)
+    has_entity = any(
+        x in joined
+        for x in ('campaign', 'program', 'advertiser', 'partner', 'publisher', 'campaign_id')
+    )
+    has_metric = any(
+        x in joined
+        for x in ('clicks', 'imps', 'impression', 'actions', 'sale_amount', 'revenue', 'conversion')
+    )
+    return has_entity and has_metric
+
+def _detect_header_row_index(all_rows: List[Any], max_scan: int = 45) -> int:
+    for i in range(min(max_scan, len(all_rows))):
+        row = all_rows[i]
+        if _looks_like_data_table_header(_row_cells_normalized(row)):
+            return i
+    return 0
+
+def _unique_column_names(raw_headers: List[str]) -> List[str]:
+    counts: Dict[str, int] = {}
+    out: List[str] = []
+    for i, h in enumerate(raw_headers):
+        base = (h or '').strip() or f'Column_{i}'
+        n = counts.get(base, 0)
+        counts[base] = n + 1
+        out.append(base if n == 0 else f'{base}_{n}')
+    return out
+
+def _sheet_rows_to_dicts(all_rows: List[Any], header_idx: int) -> tuple[List[str], List[Dict[str, Any]]]:
+    header_row = all_rows[header_idx]
+    raw_headers = [
+        str(c).strip() if c is not None else f'Column_{i}'
+        for i, c in enumerate(header_row)
+    ]
+    original_columns = _unique_column_names(raw_headers)
+    csv_rows: List[Dict[str, Any]] = []
+    for row in all_rows[header_idx + 1:]:
+        row_dict: Dict[str, str] = {}
+        for i, col in enumerate(original_columns):
+            val = row[i] if i < len(row) else None
+            row_dict[col] = str(val).strip() if val is not None else ''
+        if any(row_dict.values()):
+            csv_rows.append(row_dict)
+    return original_columns, csv_rows
+
 def parse_spreadsheet(content: bytes, filename: str):
     """Parse CSV or XLS/XLSX file and return columns + rows"""
     ext = filename.lower().rsplit('.', 1)[-1] if '.' in filename else ''
@@ -924,26 +1329,42 @@ def parse_spreadsheet(content: bytes, filename: str):
             text = content.decode('utf-8')
         except UnicodeDecodeError:
             text = content.decode('latin-1')
-        reader = csv.DictReader(io.StringIO(text))
-        original_columns = [c.strip() for c in (reader.fieldnames or [])]
-        rows = list(reader)
-        csv_rows = [{k.strip(): str(v).strip() for k, v in row.items()} for row in rows]
+        lines = text.splitlines()
+        header_line_idx = 0
+        for i, line in enumerate(lines[:50]):
+            try:
+                parsed = next(csv.reader([line]))
+            except StopIteration:
+                continue
+            if _looks_like_data_table_header(_row_cells_normalized(parsed)):
+                header_line_idx = i
+                break
+        body = '\n'.join(lines[header_line_idx:])
+        grid = list(csv.reader(io.StringIO(body)))
+        if not grid:
+            return [], []
+        raw_headers = [(c or '').strip() for c in grid[0]]
+        if raw_headers:
+            raw_headers[0] = raw_headers[0].lstrip('\ufeff')
+        original_columns = _unique_column_names(raw_headers)
+        csv_rows = []
+        for data_row in grid[1:]:
+            row_dict = {}
+            for i, col in enumerate(original_columns):
+                val = data_row[i] if i < len(data_row) else ''
+                row_dict[col] = str(val).strip() if val is not None else ''
+            if any(row_dict.values()):
+                csv_rows.append(row_dict)
 
     elif ext in ('xls', 'xlsx'):
         wb = openpyxl.load_workbook(io.BytesIO(content), read_only=True, data_only=True)
         ws = wb.active
         all_rows = list(ws.iter_rows(values_only=True))
+        wb.close()
         if not all_rows:
             return [], []
-        original_columns = [str(c).strip() if c is not None else f'Column_{i}' for i, c in enumerate(all_rows[0])]
-        csv_rows = []
-        for row in all_rows[1:]:
-            row_dict = {}
-            for i, col in enumerate(original_columns):
-                val = row[i] if i < len(row) else None
-                row_dict[col] = str(val).strip() if val is not None else ''
-            csv_rows.append(row_dict)
-        wb.close()
+        header_idx = _detect_header_row_index(all_rows)
+        original_columns, csv_rows = _sheet_rows_to_dicts(all_rows, header_idx)
     else:
         return [], []
 
@@ -951,11 +1372,14 @@ def parse_spreadsheet(content: bytes, filename: str):
 
 def extract_metrics_from_rows(csv_rows):
     """Extract summary metrics from row data"""
+    def norm_key(k: str) -> str:
+        return k.lower().replace(' ', '_').replace('-', '_').lstrip('\ufeff')
+
     def get_num(row, keys, default=0):
         for k in keys:
-            lk = k.lower().replace(' ', '_')
+            lk = norm_key(k)
             for rk, rv in row.items():
-                if rk.lower().replace(' ', '_') == lk and rv:
+                if norm_key(rk) == lk and rv not in (None, ''):
                     try:
                         return float(str(rv).replace(',', '').replace('$', '').replace('%', ''))
                     except ValueError:
@@ -968,10 +1392,13 @@ def extract_metrics_from_rows(csv_rows):
     total_revenue = 0.0
 
     for row in csv_rows:
-        total_impressions += int(get_num(row, ['impressions', 'impr', 'views', 'total_impressions']))
+        total_impressions += int(get_num(row, ['impressions', 'impr', 'imps', 'imp', 'views', 'total_impressions']))
         total_clicks += int(get_num(row, ['clicks', 'total_clicks', 'click']))
         total_conversions += int(get_num(row, ['conversions', 'conv', 'actions', 'orders']))
-        total_revenue += get_num(row, ['revenue', 'total_revenue', 'total_earnings', 'sales', 'earnings', 'amount', 'sale_amount'])
+        total_revenue += get_num(row, [
+            'revenue', 'total_revenue', 'total_earnings', 'sales', 'earnings', 'amount',
+            'sale_amount', 'gross_amount', 'gmv', 'payout', 'partner_earnings',
+        ])
 
     return BrandReportMetrics(
         impressions=total_impressions,
@@ -983,6 +1410,256 @@ def extract_metrics_from_rows(csv_rows):
         cost_per_click=round(total_revenue / total_clicks, 2) if total_clicks > 0 else 0,
         roas=round(total_revenue / (total_revenue * 0.1), 2) if total_revenue > 0 else 0
     )
+
+def _impact_norm_key(k) -> str:
+    return str(k).strip().lower().replace(' ', '_').replace('-', '_').lstrip('\ufeff')
+
+def _impact_norm_phrase(v: str) -> str:
+    return re.sub(r"[^a-z0-9]+", " ", str(v).lower()).strip()
+
+def _impact_campaign_label(row: Dict[str, Any]) -> str:
+    for want in (
+        'campaign', 'program', 'program_name', 'advertiser', 'advertiser_name',
+        'partner', 'sub_affiliate', 'media_partner',
+    ):
+        for rk, rv in row.items():
+            if _impact_norm_key(rk) == want and str(rv).strip():
+                return str(rv).strip()[:500]
+    for rk, rv in row.items():
+        if 'campaign' in _impact_norm_key(rk) and str(rv).strip():
+            return str(rv).strip()[:500]
+    return 'Program'
+
+def _impact_row_program_id(row: Dict[str, Any]) -> str:
+    for want in ("campaign_id", "program_id", "subaid", "sub_aid"):
+        for rk, rv in row.items():
+            if _impact_norm_key(rk) == want and str(rv).strip():
+                return str(rv).strip()
+    return ""
+
+def _impact_row_report_date(row: Dict[str, Any], range_end: str) -> str:
+    date_keys = (
+        'action_date', 'action_batch_date', 'date', 'report_date', 'day',
+        'event_date', 'period_end',
+    )
+    for dk in date_keys:
+        for rk, rv in row.items():
+            if _impact_norm_key(rk) != dk:
+                continue
+            raw = str(rv).strip()
+            if not raw:
+                continue
+            if re.match(r'^\d{4}-\d{2}-\d{2}', raw):
+                return raw[:10]
+            token = raw.split()[0][:16]
+            for fmt in ('%m/%d/%Y', '%m/%d/%y', '%Y-%m-%d', '%d/%m/%Y'):
+                try:
+                    return datetime.strptime(token, fmt).date().isoformat()
+                except ValueError:
+                    continue
+    return range_end.strip()[:10]
+
+def _brand_aliases(brand_user: Dict[str, Any], profile: Optional[Dict[str, Any]]) -> tuple[List[str], bool]:
+    explicit = profile.get("impact_campaign_names") if isinstance(profile, dict) else None
+    if isinstance(explicit, list):
+        normalized = []
+        seen = set()
+        for item in explicit:
+            n = _impact_norm_phrase(item)
+            if n and n not in seen:
+                seen.add(n)
+                normalized.append(n)
+        if normalized:
+            # Strict mode: only explicitly mapped campaign names are accepted.
+            return normalized, True
+
+    vals = []
+    for v in (
+        brand_user.get("company_name"),
+        brand_user.get("email"),
+        (profile or {}).get("company_name"),
+    ):
+        if not v:
+            continue
+        s = str(v).strip().lower()
+        if s:
+            vals.append(s)
+            if "@" in s:
+                vals.append(s.split("@", 1)[0])
+    cleaned = []
+    for s in vals:
+        s = re.sub(r"[^a-z0-9]+", " ", s).strip()
+        if s:
+            cleaned.append(s)
+    out = []
+    seen = set()
+    for s in cleaned:
+        if s not in seen:
+            seen.add(s)
+            out.append(s)
+    return out, False
+
+def _campaign_matches_brand(campaign: str, aliases: List[str], strict_match: bool) -> bool:
+    camp = _impact_norm_phrase(campaign)
+    if not camp:
+        return False
+    if strict_match:
+        return camp in aliases
+    for a in aliases:
+        if not a:
+            continue
+        if a in camp:
+            return True
+        a_tokens = [t for t in a.split() if len(t) >= 4]
+        if any(tok in camp for tok in a_tokens):
+            return True
+    return False
+
+
+def _impact_rows_from_json_payload(payload: Any) -> List[Dict[str, Any]]:
+    """Normalize likely Impact JSON result shapes into a list of row dicts."""
+    if isinstance(payload, list):
+        return [r for r in payload if isinstance(r, dict)]
+
+    if isinstance(payload, dict):
+        for key in ("Rows", "rows", "Data", "data", "Records", "records", "Items", "items", "Result", "result"):
+            val = payload.get(key)
+            if isinstance(val, list):
+                return [r for r in val if isinstance(r, dict)]
+        for val in payload.values():
+            if isinstance(val, list) and val and isinstance(val[0], dict):
+                return [r for r in val if isinstance(r, dict)]
+        if payload and all(not isinstance(v, (list, dict)) for v in payload.values()):
+            return [payload]
+    return []
+
+async def _impact_download_legacy_rows(
+    brand_id: str,
+    start_s: str,
+    end_s: str,
+    program_sub_id: Optional[str],
+    report_handle: Optional[str],
+    replace_matching_range: bool,
+) -> Dict[str, Any]:
+    """
+    Fetch Impact ReportExport (JSON), insert one legacy BrandReport per row (dashboard table shape).
+    Returns dict: ok, rows, brand_email, report_handle_used, meta | error
+    """
+    brand = await db.users.find_one({"id": brand_id, "role": "brand"}, {"_id": 0})
+    if not brand:
+        return {"ok": False, "error": "Brand not found", "rows": 0}
+
+    account_sid = (os.environ.get("IMPACT_ACCOUNT_SID") or "").strip()
+    auth_token = (os.environ.get("IMPACT_AUTH_TOKEN") or "").strip()
+    if not account_sid or not auth_token:
+        return {
+            "ok": False,
+            "error": "Impact API not configured (IMPACT_ACCOUNT_SID, IMPACT_AUTH_TOKEN).",
+            "rows": 0,
+            "brand_email": brand.get("email"),
+        }
+
+    try:
+        start_d = datetime.strptime(start_s.strip(), "%Y-%m-%d").date()
+        end_d = datetime.strptime(end_s.strip(), "%Y-%m-%d").date()
+    except ValueError:
+        return {"ok": False, "error": "start_date and end_date must be YYYY-MM-DD", "rows": 0, "brand_email": brand.get("email")}
+
+    if end_d < start_d:
+        return {"ok": False, "error": "end_date must be on or after start_date", "rows": 0, "brand_email": brand.get("email")}
+
+    profile = await db.brand_profiles.find_one({"user_id": brand_id}, {"_id": 0})
+    aliases, strict_match = _brand_aliases(brand, profile)
+    sub_aid = _resolve_impact_sub_aid(profile, program_sub_id)
+    handle_used = _resolve_impact_report_handle(profile, report_handle)
+
+    try:
+        raw, meta = await impact_export.export_report(
+            account_sid,
+            auth_token,
+            handle_used,
+            sub_aid=sub_aid,
+            start_date=start_s.strip(),
+            end_date=end_s.strip(),
+            result_format="JSON",
+        )
+    except httpx.HTTPStatusError as exc:
+        detail = exc.response.text[:800] if exc.response else str(exc)
+        return {
+            "ok": False,
+            "error": f"impact.com API error ({exc.response.status_code}): {detail}",
+            "rows": 0,
+            "brand_email": brand["email"],
+        }
+    except (TimeoutError, RuntimeError, ValueError) as exc:
+        return {"ok": False, "error": str(exc), "rows": 0, "brand_email": brand["email"]}
+
+    fname = meta.get("download_filename") or f"impact_{handle_used}_{start_s}_{end_s}.json"
+    rows: List[Dict[str, Any]] = []
+    lower_name = fname.lower()
+    if lower_name.endswith(".json") or str(meta.get("result_format", "")).upper() == "JSON":
+        try:
+            payload = json.loads(raw.decode("utf-8"))
+            rows = _impact_rows_from_json_payload(payload)
+        except Exception:
+            rows = []
+    if not rows:
+        # Fallback for providers that still return CSV despite JSON request
+        _, rows = parse_spreadsheet(raw, fname if "." in fname else f"{fname}.csv")
+
+    if not rows:
+        return {
+            "ok": False,
+            "error": "Impact export contained no parseable rows",
+            "rows": 0,
+            "brand_email": brand["email"],
+        }
+
+    if replace_matching_range:
+        await db.brand_reports.delete_many({
+            "brand_id": brand_id,
+            "custom_data.source": "impact_report_export",
+            "custom_data.impact_range_start": start_s.strip(),
+            "custom_data.impact_range_end": end_s.strip(),
+        })
+
+    docs = []
+    base_fn = fname.rsplit(".", 1)[0][:120]
+    for row in rows:
+        camp = _impact_campaign_label(row)
+        if aliases and not _campaign_matches_brand(camp, aliases, strict_match):
+            continue
+        rdate = _impact_row_report_date(row, end_s)
+        metrics = extract_metrics_from_rows([row])
+        br = BrandReport(
+            brand_id=brand_id,
+            report_date=rdate,
+            period="daily",
+            metrics=metrics,
+            campaign_breakdown=[{"campaign": camp}],
+            custom_data={
+                "source": "impact_report_export",
+                "impact": meta,
+                "impact_range_start": start_s.strip(),
+                "impact_range_end": end_s.strip(),
+                "impact_report_handle": handle_used,
+            },
+            csv_columns=[],
+            csv_rows=[],
+            filename=f"{base_fn} — {camp}"[:220],
+        )
+        docs.append(br.model_dump())
+
+    if docs:
+        await db.brand_reports.insert_many(docs)
+
+    return {
+        "ok": True,
+        "rows": len(docs),
+        "brand_email": brand["email"],
+        "report_handle_used": handle_used,
+        "meta": meta,
+    }
 
 ALLOWED_EXTENSIONS = ('.csv', '.xls', '.xlsx')
 
