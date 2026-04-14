@@ -24,7 +24,7 @@ export default function BrandReporting() {
   const { user } = useAuth();
   const reportEmail = user?.email || '';
 
-  useEffect(() => { fetchData(); }, []);
+  useEffect(() => { fetchData(); }, [fetchData]);
 
   const fetchData = useCallback(async () => {
     try {
@@ -70,14 +70,14 @@ export default function BrandReporting() {
     e.stopPropagation();
     if (e.type === 'dragenter' || e.type === 'dragover') setDragActive(true);
     else if (e.type === 'dragleave') setDragActive(false);
-  }, [processFile]);
+  }, []);
 
   const handleDrop = useCallback((e) => {
     e.preventDefault();
     e.stopPropagation();
     setDragActive(false);
     if (e.dataTransfer.files?.[0]) processFile(e.dataTransfer.files[0]);
-  }, []);
+  }, [processFile]);
 
   const handleClearReports = async () => {
     if (!window.confirm('Are you sure you want to clear all reports?')) return;
