@@ -41,6 +41,16 @@ code {
     }
 }
 
+.admin-date-input::-webkit-calendar-picker-indicator {
+    opacity: 0.75;
+    cursor: pointer;
+}
+
+[data-admin-theme="dark"] .admin-date-input::-webkit-calendar-picker-indicator {
+    filter: invert(1) brightness(1.15);
+    opacity: 0.95;
+}
+
 @layer base {
     * {
         @apply border-border;

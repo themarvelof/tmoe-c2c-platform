@@ -341,13 +341,13 @@ export default function AdminDashboard() {
                 type="date"
                 value={dateRange.start_date}
                 onChange={(event) => setDateRange((previous) => ({ ...previous, start_date: event.target.value }))}
-                className="h-11 rounded-xl border border-[var(--adm-border)] bg-[var(--adm-surface-alt)] px-3 text-sm text-[var(--adm-text)] outline-none"
+                className="admin-date-input h-11 rounded-xl border border-[var(--adm-border)] bg-[var(--adm-surface-alt)] px-3 text-sm text-[var(--adm-text)] outline-none"
               />
               <input
                 type="date"
                 value={dateRange.end_date}
                 onChange={(event) => setDateRange((previous) => ({ ...previous, end_date: event.target.value }))}
-                className="h-11 rounded-xl border border-[var(--adm-border)] bg-[var(--adm-surface-alt)] px-3 text-sm text-[var(--adm-text)] outline-none"
+                className="admin-date-input h-11 rounded-xl border border-[var(--adm-border)] bg-[var(--adm-surface-alt)] px-3 text-sm text-[var(--adm-text)] outline-none"
               />
               <button
                 type="button"

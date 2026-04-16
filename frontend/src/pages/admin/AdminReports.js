@@ -116,7 +116,7 @@ export default function AdminReports() {
   if (loading) {
     return (
       <DashboardLayout role="admin">
-        <div className="p-8 flex items-center gap-3">
+        <div className="p-8 flex items-center gap-3 text-[var(--adm-text)]">
           <div className="h-5 w-5 rounded-full border-2 border-primary border-t-transparent animate-spin" />
           <span>Loading Impact reports...</span>
         </div>
@@ -126,32 +126,34 @@ export default function AdminReports() {
 
   return (
     <DashboardLayout role="admin">
-      <div className="p-8 bg-muted min-h-screen" data-testid="admin-reports-page">
+      <div className="p-8 bg-[var(--adm-bg)] text-[var(--adm-text)] min-h-screen" data-testid="admin-reports-page">
         <div className="mb-8">
-          <h1 className="font-heading text-4xl font-bold text-foreground">All Brand Reports</h1>
-          <p className="text-muted-foreground mt-2">
+          <h1 className="font-heading text-4xl font-bold text-[var(--adm-text)]">All Brand Reports</h1>
+          <p className="text-[var(--adm-muted)] mt-2">
             Performance reports across all brands &middot; {brandReports.length} brands &middot; {brandReports.reduce((a, b) => a + b.report_count, 0)} reports
           </p>
           <div className="mt-4 flex items-end gap-3 flex-wrap">
             <div className="space-y-1">
-              <Label htmlFor="start-date">Start date</Label>
+              <Label htmlFor="start-date" className="text-[var(--adm-muted)]">Start date</Label>
               <Input
                 id="start-date"
                 type="date"
                 value={dateRange.start_date}
                 onChange={(e) => setDateRange((d) => ({ ...d, start_date: e.target.value }))}
+                className="admin-date-input bg-[var(--adm-surface-alt)] border-[var(--adm-border)] text-[var(--adm-text)]"
               />
             </div>
             <div className="space-y-1">
-              <Label htmlFor="end-date">End date</Label>
+              <Label htmlFor="end-date" className="text-[var(--adm-muted)]">End date</Label>
               <Input
                 id="end-date"
                 type="date"
                 value={dateRange.end_date}
                 onChange={(e) => setDateRange((d) => ({ ...d, end_date: e.target.value }))}
+                className="admin-date-input bg-[var(--adm-surface-alt)] border-[var(--adm-border)] text-[var(--adm-text)]"
               />
             </div>
-            <Button onClick={fetchImpactData} disabled={fetching}>
+            <Button onClick={fetchImpactData} disabled={fetching} className="bg-[#f91445] text-white hover:bg-[#ff2958]">
               <CloudArrowDown size={16} className="mr-1" />
               {fetching ? 'Fetching...' : 'Fetch Impact Data'}
             </Button>
@@ -164,10 +166,10 @@ export default function AdminReports() {
         )}
 
         {brandReports.length === 0 ? (
-          <div className="bg-white rounded-lg border p-12 text-center" data-testid="no-reports">
-            <ChartBar size={48} className="mx-auto mb-4 text-muted-foreground" />
-            <h3 className="font-heading text-xl font-bold text-foreground mb-2">No Reports Yet</h3>
-            <p className="text-muted-foreground">Brand reports will appear here once uploaded.</p>
+          <div className="bg-[var(--adm-surface)] rounded-lg border border-[var(--adm-border)] p-12 text-center" data-testid="no-reports">
+            <ChartBar size={48} className="mx-auto mb-4 text-[var(--adm-muted)]" />
+            <h3 className="font-heading text-xl font-bold text-[var(--adm-text)] mb-2">No Reports Yet</h3>
+            <p className="text-[var(--adm-muted)]">Brand reports will appear here once uploaded.</p>
           </div>
         ) : (
           <div className="space-y-4">
@@ -176,15 +178,15 @@ export default function AdminReports() {
               const hasRecords = br.records && br.records.length > 0;
 
               return (
-                <div key={br.brand.id} className="bg-white rounded-lg border" data-testid={`admin-brand-report-${br.brand.id}`}>
+                <div key={br.brand.id} className="bg-[var(--adm-surface)] rounded-lg border border-[var(--adm-border)]" data-testid={`admin-brand-report-${br.brand.id}`}>
                   <div className="flex items-center justify-between p-5">
                     <button onClick={() => setExpandedBrand(isExpanded ? null : br.brand.id)} className="flex items-center gap-4 flex-1 text-left">
                       <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
                         <ChartBar size={20} className="text-primary" />
                       </div>
                       <div>
-                        <h3 className="font-heading text-lg font-bold text-foreground">{br.brand.company_name || br.brand.email}</h3>
-                        <div className="flex items-center gap-3 text-sm text-muted-foreground">
+                        <h3 className="font-heading text-lg font-bold text-[var(--adm-text)]">{br.brand.company_name || br.brand.email}</h3>
+                        <div className="flex items-center gap-3 text-sm text-[var(--adm-muted)]">
                           <span className="flex items-center gap-1"><EnvelopeSimple size={14} /> {br.brand.email}</span>
                           <span>&middot; {br.report_count} reports</span>
                         </div>
@@ -193,8 +195,8 @@ export default function AdminReports() {
                     <div className="flex items-center gap-4">
                       {br.summary.total_revenue > 0 && (
                         <div className="text-right mr-4">
-                          <div className="font-mono text-lg font-bold text-foreground">${br.summary.total_revenue.toLocaleString()}</div>
-                          <div className="text-xs text-muted-foreground">Revenue</div>
+                          <div className="font-mono text-lg font-bold text-[var(--adm-text)]">${br.summary.total_revenue.toLocaleString()}</div>
+                          <div className="text-xs text-[var(--adm-muted)]">Revenue</div>
                         </div>
                       )}
                       <div className="flex items-center gap-2 flex-wrap justify-end">
@@ -202,6 +204,7 @@ export default function AdminReports() {
                           variant="outline"
                           size="sm"
                           onClick={fetchImpactData}
+                          className="border-[var(--adm-border)] bg-[var(--adm-surface-alt)] text-[var(--adm-text)] hover:bg-[var(--adm-hover)]"
                           data-testid={`impact-import-${br.brand.id}`}
                         >
                           <CloudArrowDown size={16} className="mr-1" /> Fetch Impact Data
@@ -214,25 +217,25 @@ export default function AdminReports() {
                   </div>
 
                   {isExpanded && (
-                    <div className="border-t p-5 space-y-5">
+                    <div className="border-t border-[var(--adm-border)] p-5 space-y-5">
                       {hasRecords && (
-                        <div className="overflow-x-auto rounded-lg border">
+                        <div className="overflow-x-auto rounded-lg border border-[var(--adm-border)]">
                           <table className="w-full text-sm">
                             <thead>
-                              <tr className="bg-muted/50 border-b">
-                                <th className="px-4 py-2 text-left text-xs font-semibold text-muted-foreground">Campaign</th>
-                                <th className="px-4 py-2 text-right text-xs font-semibold text-muted-foreground">Clicks</th>
-                                <th className="px-4 py-2 text-right text-xs font-semibold text-muted-foreground">Conversions</th>
-                                <th className="px-4 py-2 text-right text-xs font-semibold text-muted-foreground">Revenue</th>
+                              <tr className="bg-[var(--adm-surface-alt)] border-b border-[var(--adm-border)]">
+                                <th className="px-4 py-2 text-left text-xs font-semibold text-[var(--adm-muted)]">Campaign</th>
+                                <th className="px-4 py-2 text-right text-xs font-semibold text-[var(--adm-muted)]">Clicks</th>
+                                <th className="px-4 py-2 text-right text-xs font-semibold text-[var(--adm-muted)]">Conversions</th>
+                                <th className="px-4 py-2 text-right text-xs font-semibold text-[var(--adm-muted)]">Revenue</th>
                               </tr>
                             </thead>
                             <tbody>
                               {br.records.map((row, idx) => (
-                                <tr key={idx} className="border-b hover:bg-muted/20">
-                                  <td className="px-4 py-2">{row.campaign}</td>
-                                  <td className="px-4 py-2 text-right font-mono">{Number(row.clicks || 0).toLocaleString()}</td>
-                                  <td className="px-4 py-2 text-right font-mono">{Number(row.conversions || 0).toLocaleString()}</td>
-                                  <td className="px-4 py-2 text-right font-mono">${Number(row.revenue || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}</td>
+                                <tr key={idx} className="border-b border-[var(--adm-border)] hover:bg-[var(--adm-hover)]">
+                                  <td className="px-4 py-2 text-[var(--adm-text)]">{row.campaign}</td>
+                                  <td className="px-4 py-2 text-right font-mono text-[var(--adm-text)]">{Number(row.clicks || 0).toLocaleString()}</td>
+                                  <td className="px-4 py-2 text-right font-mono text-[var(--adm-text)]">{Number(row.conversions || 0).toLocaleString()}</td>
+                                  <td className="px-4 py-2 text-right font-mono text-[var(--adm-text)]">${Number(row.revenue || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}</td>
                                 </tr>
                               ))}
                             </tbody>
@@ -240,7 +243,7 @@ export default function AdminReports() {
                         </div>
                       )}
                       {!hasRecords && (
-                        <p className="text-sm text-muted-foreground text-center py-4">No Impact data in selected date range.</p>
+                        <p className="text-sm text-[var(--adm-muted)] text-center py-4">No Impact data in selected date range.</p>
                       )}
                     </div>
                   )}
