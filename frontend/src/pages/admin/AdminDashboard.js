@@ -74,6 +74,10 @@ function computeTrend(series, key) {
   return ((current - previous) / previous) * 100;
 }
 
+function normalizeText(value) {
+  return String(value ?? '').toLowerCase();
+}
+
 export default function AdminDashboard() {
   const [stats, setStats] = useState(null);
   const [reportData, setReportData] = useState({ daily: [], summary: [], table: [] });
@@ -129,6 +133,8 @@ export default function AdminDashboard() {
     fetchDashboardData(defaultDateRange(), false);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const normalizedQuery = searchTerm.trim().toLowerCase();
+
   const filteredRows = useMemo(() => {
     const rows = reportData.table || [];
     return rows
@@ -138,11 +144,19 @@ export default function AdminDashboard() {
         return { ...row, status };
       })
       .filter((row) => {
-        const campaignMatches = row.campaign?.toLowerCase().includes(searchTerm.trim().toLowerCase());
+        const searchableText = [
+          row.campaign,
+          row.date,
+          toShortDate(row.date),
+          row.status,
+        ]
+          .map(normalizeText)
+          .join(' ');
+        const campaignMatches = !normalizedQuery || searchableText.includes(normalizedQuery);
         const statusMatches = statusFilter === 'all' || row.status === statusFilter;
         return campaignMatches && statusMatches;
       });
-  }, [reportData.table, searchTerm, statusFilter]);
+  }, [reportData.table, normalizedQuery, statusFilter]);
 
   const paginatedRows = useMemo(() => {
     const start = (page - 1) * PAGE_SIZE;
@@ -161,17 +175,28 @@ export default function AdminDashboard() {
 
   const totals = useMemo(() => {
     const tableRows = reportData.table || [];
-    const revenue = tableRows.reduce((sum, row) => sum + Number(row.revenue || 0), 0);
-    const clicks = tableRows.reduce((sum, row) => sum + Number(row.clicks || 0), 0);
-    const conversions = tableRows.reduce((sum, row) => sum + Number(row.conversions || 0), 0);
+    const summaryRows = reportData.summary || [];
+    const dailyRows = reportData.daily || [];
+
+    const tableRevenue = tableRows.reduce((sum, row) => sum + Number(row.revenue || 0), 0);
+    const tableClicks = tableRows.reduce((sum, row) => sum + Number(row.clicks || 0), 0);
+    const tableConversions = tableRows.reduce((sum, row) => sum + Number(row.conversions || 0), 0);
     const impressions = tableRows.reduce((sum, row) => sum + Number(row.impressions || 0), 0);
+
+    const summaryRevenue = summaryRows.reduce((sum, row) => sum + Number(row.revenue || 0), 0);
+    const summaryClicks = summaryRows.reduce((sum, row) => sum + Number(row.clicks || 0), 0);
+    const summaryConversions = summaryRows.reduce((sum, row) => sum + Number(row.actions || 0), 0);
+    const dailyImpressions = dailyRows.reduce((sum, row) => sum + Number(row.impressions || 0), 0);
+
     return {
-      revenue: revenue || Number(stats?.total_gmv || 0),
-      clicks,
-      conversions,
-      impressions,
+      // Prefer Impact summary metrics because they are available even when table/daily
+      // rows are sparse for a selected range.
+      revenue: summaryRevenue || tableRevenue || Number(stats?.total_gmv || 0),
+      clicks: summaryClicks || tableClicks,
+      conversions: summaryConversions || tableConversions,
+      impressions: impressions || dailyImpressions,
     };
-  }, [reportData.table, stats?.total_gmv]);
+  }, [reportData.table, reportData.summary, reportData.daily, stats?.total_gmv]);
 
   const trends = useMemo(() => {
     const daily = reportData.daily || [];
@@ -197,19 +222,23 @@ export default function AdminDashboard() {
   const donutData = useMemo(
     () =>
       (reportData.summary || [])
+        .filter((item) => {
+          if (!normalizedQuery) return true;
+          return normalizeText(item.campaign).includes(normalizedQuery);
+        })
         .slice(0, 6)
         .map((item) => ({
           name: item.campaign,
           value: Number(item.revenue || 0),
         }))
         .filter((item) => item.value > 0),
-    [reportData.summary]
+    [reportData.summary, normalizedQuery]
   );
 
   const kpiCards = [
     {
       title: 'Revenue',
-      value: `QAR ${totals.revenue.toLocaleString(undefined, { maximumFractionDigits: 2 })}`,
+      value: `$${totals.revenue.toLocaleString(undefined, { maximumFractionDigits: 2 })}`,
       trend: trends.revenue,
       icon: CurrencyDollar,
       glow: 'from-[#f91445]/30 to-[#f91445]/0',
@@ -430,7 +459,7 @@ export default function AdminDashboard() {
                     </Pie>
                     <Tooltip
                       contentStyle={CHART_TOOLTIP_STYLE}
-                      formatter={(value) => [`QAR ${Number(value).toLocaleString()}`, 'Revenue']}
+                      formatter={(value) => [`$${Number(value).toLocaleString()}`, 'Revenue']}
                     />
                   </PieChart>
                 </ResponsiveContainer>
@@ -520,7 +549,7 @@ export default function AdminDashboard() {
                         <td className="px-4 py-3 text-right text-[var(--adm-text)]">{Number(row.impressions || 0).toLocaleString()}</td>
                         <td className="px-4 py-3 text-right text-[var(--adm-text)]">{Number(row.clicks || 0).toLocaleString()}</td>
                         <td className="px-4 py-3 text-right text-[var(--adm-text)]">{Number(row.conversions || 0).toLocaleString()}</td>
-                        <td className="px-4 py-3 text-right font-medium text-[var(--adm-text)]">QAR {Number(row.revenue || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}</td>
+                        <td className="px-4 py-3 text-right font-medium text-[var(--adm-text)]">${Number(row.revenue || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}</td>
                         <td className="px-4 py-3 text-right">
                           <span
                             className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ${
