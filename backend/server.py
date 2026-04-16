@@ -9,6 +9,8 @@ import logging
 import csv
 import io
 import json
+import hashlib
+import hmac
 import openpyxl
 from pathlib import Path
 from pydantic import BaseModel, Field, ConfigDict, EmailStr
@@ -408,6 +410,70 @@ def require_role(required_roles: List[str]):
         return current_user
     return role_checker
 
+def hash_password(password: str) -> str:
+    """Hash password as salt:hash using scrypt (node-compatible shape)."""
+    salt = os.urandom(16).hex()
+    derived = hashlib.scrypt(
+        password.encode("utf-8"),
+        salt=bytes.fromhex(salt),
+        n=2**14,
+        r=8,
+        p=1,
+        dklen=64,
+    ).hex()
+    return f"{salt}:{derived}"
+
+def verify_password(password: str, stored: str) -> bool:
+    """
+    Verify scrypt salt:hash format.
+    Falls back to legacy bcrypt hashes for existing users.
+    """
+    if ":" in stored:
+        try:
+            salt, hashed = stored.split(":", 1)
+            if not salt or not hashed:
+                return False
+            derived = hashlib.scrypt(
+                password.encode("utf-8"),
+                salt=bytes.fromhex(salt),
+                n=2**14,
+                r=8,
+                p=1,
+                dklen=64,
+            ).hex()
+            return hmac.compare_digest(derived, hashed)
+        except Exception:
+            return False
+    try:
+        return pwd_context.verify(password, stored)
+    except Exception:
+        return False
+
+SEED_ACCOUNT_PASSWORDS = {
+    "admin@tmoe.com": "Admin@123",
+    "abhishek@marvelof.com": "Publisher@123",
+    "amazontmoe@marvelof.com": "Amazon@123",
+    "skyscanner@gmail.com": "Skyscanner@123",
+}
+
+async def repair_missing_seed_password(user: Dict[str, Any]) -> Optional[str]:
+    """
+    Backfill password_hash for known seeded accounts when older docs are missing it.
+    Returns repaired hash if patched, else None.
+    """
+    email = str(user.get("email") or "").strip().lower()
+    if email not in SEED_ACCOUNT_PASSWORDS:
+        return None
+    if user.get("password_hash"):
+        return str(user.get("password_hash"))
+    repaired = hash_password(SEED_ACCOUNT_PASSWORDS[email])
+    await db.users.update_one(
+        {"id": user.get("id")},
+        {"$set": {"password_hash": repaired}}
+    )
+    logger.warning("Repaired missing password_hash for seeded account %s", email)
+    return repaired
+
 def _impact_credentials_configured() -> bool:
     sid = (os.environ.get("IMPACT_ACCOUNT_SID") or "").strip()
     tok = (os.environ.get("IMPACT_AUTH_TOKEN") or "").strip()
@@ -447,7 +513,7 @@ async def register(user_data: UserRegister):
         raise HTTPException(status_code=400, detail="Email already registered")
     
     # Hash password
-    password_hash = pwd_context.hash(user_data.password)
+    password_hash = hash_password(user_data.password)
     
     # Create user
     user = User(
@@ -470,18 +536,35 @@ async def login(credentials: UserLogin):
     user = await db.users.find_one({"email": credentials.email}, {"_id": 0})
     if not user:
         raise HTTPException(status_code=401, detail="Invalid credentials")
-    
-    if not pwd_context.verify(credentials.password, user["password_hash"]):
+
+    password_hash = user.get("password_hash")
+    if not password_hash or not isinstance(password_hash, str):
+        repaired = await repair_missing_seed_password(user)
+        if repaired:
+            password_hash = repaired
+            user["password_hash"] = repaired
+        else:
+            logger.warning("Login blocked for %s: missing password_hash in user record", credentials.email)
+            raise HTTPException(status_code=401, detail="Invalid credentials")
+
+    if not verify_password(credentials.password, password_hash):
         raise HTTPException(status_code=401, detail="Invalid credentials")
-    
-    if user["status"] == UserStatus.PENDING:
+
+    status_value = user.get("status", UserStatus.PENDING)
+    if status_value == UserStatus.PENDING:
         raise HTTPException(status_code=403, detail="Account pending admin approval")
-    
-    if user["status"] in [UserStatus.REJECTED, UserStatus.SUSPENDED]:
-        raise HTTPException(status_code=403, detail=f"Account {user['status']}")
-    
-    token = create_access_token({"user_id": user["id"], "role": user["role"]})
-    
+
+    if status_value in [UserStatus.REJECTED, UserStatus.SUSPENDED]:
+        raise HTTPException(status_code=403, detail=f"Account {status_value}")
+
+    user_id = user.get("id")
+    role = user.get("role")
+    if not user_id or not role:
+        logger.error("Login failed for %s: user record missing id/role", credentials.email)
+        raise HTTPException(status_code=500, detail="Account data is incomplete")
+
+    token = create_access_token({"user_id": user_id, "role": role})
+
     return {
         "token": token,
         "user": UserResponse(**user)
@@ -528,7 +611,7 @@ async def create_brand_account(
         raise HTTPException(status_code=400, detail="Email already registered")
     
     # Hash password
-    password_hash = pwd_context.hash(user_data.password)
+    password_hash = hash_password(user_data.password)
     
     # Create brand user with approved status (admin created, so pre-approved)
     user = User(
@@ -2003,7 +2086,7 @@ async def seed_admin():
         return {"message": "Admin already exists"}
     
     # Create admin user
-    password_hash = pwd_context.hash("Admin@123")
+    password_hash = hash_password("Admin@123")
     admin_user = User(
         email="admin@tmoe.com",
         password_hash=password_hash,
@@ -2051,11 +2134,21 @@ logger = logging.getLogger(__name__)
 async def startup_seed():
     """Seed essential data on startup if not already present."""
     try:
+        # Repair legacy seeded users that may exist without password_hash.
+        for email, plain_password in SEED_ACCOUNT_PASSWORDS.items():
+            doc = await db.users.find_one({"email": email}, {"_id": 0})
+            if doc and not doc.get("password_hash"):
+                await db.users.update_one(
+                    {"id": doc.get("id")},
+                    {"$set": {"password_hash": hash_password(plain_password)}}
+                )
+                logger.info("Repaired missing password hash for %s", email)
+
         # 1. Seed Admin
         if not await db.users.find_one({"email": "admin@tmoe.com"}):
             admin_user = User(
                 email="admin@tmoe.com",
-                password_hash=pwd_context.hash("Admin@123"),
+                password_hash=hash_password("Admin@123"),
                 role=UserRole.ADMIN,
                 status=UserStatus.APPROVED,
                 company_name="TMOE Operations"
@@ -2068,7 +2161,7 @@ async def startup_seed():
         if not pub_doc:
             pub_user = User(
                 email="abhishek@marvelof.com",
-                password_hash=pwd_context.hash("Publisher@123"),
+                password_hash=hash_password("Publisher@123"),
                 role=UserRole.PUBLISHER,
                 status=UserStatus.APPROVED,
                 company_name="Marvel of Everything",
@@ -2101,7 +2194,7 @@ async def startup_seed():
         if not brand_doc:
             brand_user = User(
                 email="amazontmoe@marvelof.com",
-                password_hash=pwd_context.hash("Amazon@123"),
+                password_hash=hash_password("Amazon@123"),
                 role=UserRole.BRAND,
                 status=UserStatus.APPROVED,
                 company_name="Amazon TMOE",
@@ -2137,7 +2230,7 @@ async def startup_seed():
         if not sky_doc:
             sky_user = User(
                 email="skyscanner@gmail.com",
-                password_hash=pwd_context.hash("Skyscanner@123"),
+                password_hash=hash_password("Skyscanner@123"),
                 role=UserRole.BRAND,
                 status=UserStatus.APPROVED,
                 company_name="Skyscanner",

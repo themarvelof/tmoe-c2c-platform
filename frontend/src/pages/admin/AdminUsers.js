@@ -45,11 +45,11 @@ export default function AdminUsers() {
 
   const getRoleBadge = (role) => {
     const colors = {
-      publisher: 'bg-primary/20 border-primary',
-      brand: 'bg-accent/20 border-accent',
-      admin: 'bg-muted border-foreground'
+      publisher: 'bg-[#f91445]/15 text-[#f91445] border-[#f91445]/40',
+      brand: 'bg-[#7c3aed]/15 text-[#7c3aed] border-[#7c3aed]/40',
+      admin: 'bg-[var(--adm-chip)] text-[var(--adm-text)] border-[var(--adm-border-strong)]'
     };
-    return colors[role] || 'border-foreground';
+    return colors[role] || 'bg-[var(--adm-chip)] text-[var(--adm-text)] border-[var(--adm-border-strong)]';
   };
 
   const getStatusBadge = (status) => {
@@ -87,26 +87,30 @@ export default function AdminUsers() {
 
           <TabsContent value="pending">
             {pendingUsers.length === 0 ? (
-              <div className="border border-foreground p-12 text-center">
-                <p className="text-muted-foreground">No pending verifications</p>
+              <div className="rounded-xl border border-[var(--adm-border)] bg-[var(--adm-surface)] p-12 text-center">
+                <p className="text-[var(--adm-muted)]">No pending verifications</p>
               </div>
             ) : (
-              <div className="border border-foreground">
+              <div className="overflow-hidden rounded-xl border border-[var(--adm-border)] bg-[var(--adm-surface)]">
                 <div className="overflow-x-auto">
                   <table className="w-full">
                     <thead>
-                      <tr className="border-b border-foreground text-left bg-muted">
-                        <th className="p-4 font-medium">Email</th>
-                        <th className="p-4 font-medium">Role</th>
-                        <th className="p-4 font-medium">Company</th>
-                        <th className="p-4 font-medium">Website</th>
-                        <th className="p-4 font-medium">Registered</th>
-                        <th className="p-4 font-medium">Actions</th>
+                      <tr className="border-b border-[var(--adm-border)] bg-[var(--adm-surface-alt)] text-left">
+                        <th className="p-4 font-medium text-[var(--adm-muted)]">Email</th>
+                        <th className="p-4 font-medium text-[var(--adm-muted)]">Role</th>
+                        <th className="p-4 font-medium text-[var(--adm-muted)]">Company</th>
+                        <th className="p-4 font-medium text-[var(--adm-muted)]">Website</th>
+                        <th className="p-4 font-medium text-[var(--adm-muted)]">Registered</th>
+                        <th className="p-4 font-medium text-[var(--adm-muted)]">Actions</th>
                       </tr>
                     </thead>
                     <tbody>
                       {pendingUsers.map((user) => (
-                        <tr key={user.id} className="border-b border-border" data-testid={`pending-user-${user.id}`}>
+                        <tr
+                          key={user.id}
+                          className="border-b border-[var(--adm-border)] hover:bg-[var(--adm-hover)]"
+                          data-testid={`pending-user-${user.id}`}
+                        >
                           <td className="p-4">{user.email}</td>
                           <td className="p-4">
                             <span className={`px-3 py-1 text-xs font-medium border ${getRoleBadge(user.role)}`}>
@@ -157,22 +161,26 @@ export default function AdminUsers() {
           </TabsContent>
 
           <TabsContent value="all">
-            <div className="border border-foreground">
+            <div className="overflow-hidden rounded-xl border border-[var(--adm-border)] bg-[var(--adm-surface)]">
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead>
-                    <tr className="border-b border-foreground text-left bg-muted">
-                      <th className="p-4 font-medium">Email</th>
-                      <th className="p-4 font-medium">Role</th>
-                      <th className="p-4 font-medium">Status</th>
-                      <th className="p-4 font-medium">Company</th>
-                      <th className="p-4 font-medium">Registered</th>
-                      <th className="p-4 font-medium">Actions</th>
+                    <tr className="border-b border-[var(--adm-border)] bg-[var(--adm-surface-alt)] text-left">
+                      <th className="p-4 font-medium text-[var(--adm-muted)]">Email</th>
+                      <th className="p-4 font-medium text-[var(--adm-muted)]">Role</th>
+                      <th className="p-4 font-medium text-[var(--adm-muted)]">Status</th>
+                      <th className="p-4 font-medium text-[var(--adm-muted)]">Company</th>
+                      <th className="p-4 font-medium text-[var(--adm-muted)]">Registered</th>
+                      <th className="p-4 font-medium text-[var(--adm-muted)]">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
                     {allUsers.map((user) => (
-                      <tr key={user.id} className="border-b border-border" data-testid={`user-${user.id}`}>
+                      <tr
+                        key={user.id}
+                        className="border-b border-[var(--adm-border)] hover:bg-[var(--adm-hover)]"
+                        data-testid={`user-${user.id}`}
+                      >
                         <td className="p-4">{user.email}</td>
                         <td className="p-4">
                           <span className={`px-3 py-1 text-xs font-medium border ${getRoleBadge(user.role)}`}>

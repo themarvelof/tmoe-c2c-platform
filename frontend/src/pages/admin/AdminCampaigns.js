@@ -549,26 +549,30 @@ export default function AdminCampaigns() {
         </Dialog>
 
         {campaigns.length === 0 ? (
-          <div className="border border-foreground p-12 text-center">
-            <p className="text-muted-foreground">No campaigns yet. Create your first campaign.</p>
+          <div className="rounded-xl border border-[var(--adm-border)] bg-[var(--adm-surface)] p-12 text-center">
+            <p className="text-[var(--adm-muted)]">No campaigns yet. Create your first campaign.</p>
           </div>
         ) : (
-          <div className="border border-foreground">
+          <div className="overflow-hidden rounded-xl border border-[var(--adm-border)] bg-[var(--adm-surface)]">
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
-                  <tr className="border-b border-foreground text-left bg-muted">
-                    <th className="p-4 font-medium">Campaign Name</th>
-                    <th className="p-4 font-medium">Category</th>
-                    <th className="p-4 font-medium">Status</th>
-                    <th className="p-4 font-medium">Budget</th>
-                    <th className="p-4 font-medium">Est. ROI</th>
-                    <th className="p-4 font-medium">Actions</th>
+                  <tr className="border-b border-[var(--adm-border)] bg-[var(--adm-surface-alt)] text-left">
+                    <th className="p-4 font-medium text-[var(--adm-muted)]">Campaign Name</th>
+                    <th className="p-4 font-medium text-[var(--adm-muted)]">Category</th>
+                    <th className="p-4 font-medium text-[var(--adm-muted)]">Status</th>
+                    <th className="p-4 font-medium text-[var(--adm-muted)]">Budget</th>
+                    <th className="p-4 font-medium text-[var(--adm-muted)]">Est. ROI</th>
+                    <th className="p-4 font-medium text-[var(--adm-muted)]">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {campaigns.map((campaign) => (
-                    <tr key={campaign.id} className="border-b border-border hover:bg-muted/50" data-testid={`campaign-${campaign.id}`}>
+                    <tr
+                      key={campaign.id}
+                      className="border-b border-[var(--adm-border)] hover:bg-[var(--adm-hover)]"
+                      data-testid={`campaign-${campaign.id}`}
+                    >
                       <td className="p-4 font-medium">{campaign.name}</td>
                       <td className="p-4">{campaign.category}</td>
                       <td className="p-4">

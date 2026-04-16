@@ -45,26 +45,36 @@ export default function AdminDirectory() {
 
   return (
     <DashboardLayout role="admin">
-      <div className="p-8 bg-muted min-h-screen" data-testid="admin-directory-page">
-        <h1 className="font-heading text-4xl font-bold text-foreground mb-8">Directory</h1>
+      <div className="min-h-screen bg-[var(--adm-bg)] p-8 text-[var(--adm-text)]" data-testid="admin-directory-page">
+        <h1 className="mb-8 font-heading text-4xl font-bold text-[var(--adm-text)]">Directory</h1>
 
         <Tabs defaultValue="publishers" className="w-full">
-          <TabsList className="mb-6">
-            <TabsTrigger value="publishers">Publishers ({publishers.length})</TabsTrigger>
-            <TabsTrigger value="brands">Brands ({brands.length})</TabsTrigger>
+          <TabsList className="mb-6 border border-[var(--adm-border)] bg-[var(--adm-surface-alt)]">
+            <TabsTrigger
+              value="publishers"
+              className="text-[var(--adm-muted)] data-[state=active]:bg-[var(--adm-surface)] data-[state=active]:text-[var(--adm-text)]"
+            >
+              Publishers ({publishers.length})
+            </TabsTrigger>
+            <TabsTrigger
+              value="brands"
+              className="text-[var(--adm-muted)] data-[state=active]:bg-[var(--adm-surface)] data-[state=active]:text-[var(--adm-text)]"
+            >
+              Brands ({brands.length})
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="publishers">
             {publishers.length === 0 ? (
-              <div className="bg-white rounded-lg border p-12 text-center">
-                <p className="text-muted-foreground">No publishers yet</p>
+              <div className="rounded-lg border border-[var(--adm-border)] bg-[var(--adm-surface)] p-12 text-center">
+                <p className="text-[var(--adm-muted)]">No publishers yet</p>
               </div>
             ) : (
               <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {publishers.map((pubData) => (
                   <div
                     key={pubData.user.id}
-                    className="bg-white rounded-lg border p-6 hover:shadow-lg transition-shadow"
+                    className="rounded-lg border border-[var(--adm-border)] bg-[var(--adm-surface)] p-6 transition-shadow hover:shadow-lg"
                     data-testid={`publisher-${pubData.user.id}`}
                   >
                     {pubData.profile?.logo_url ? (
@@ -74,24 +84,24 @@ export default function AdminDirectory() {
                         className="h-16 w-16 object-contain rounded mb-4"
                       />
                     ) : (
-                      <div className="h-16 w-16 rounded bg-muted flex items-center justify-center mb-4">
+                      <div className="mb-4 flex h-16 w-16 items-center justify-center rounded bg-[var(--adm-surface-alt)]">
                         <Users size={32} className="text-primary" />
                       </div>
                     )}
 
-                    <h3 className="font-heading text-xl font-bold text-foreground mb-2">
+                    <h3 className="mb-2 font-heading text-xl font-bold text-[var(--adm-text)]">
                       {pubData.profile?.name || pubData.user.email}
                     </h3>
 
                     <div className="mb-4">
-                      <div className="text-xs text-muted-foreground mb-1">Publisher ID</div>
+                      <div className="mb-1 text-xs text-[var(--adm-muted)]">Publisher ID</div>
                       <div className="flex items-center gap-2">
-                        <code className="text-xs bg-muted px-2 py-1 rounded flex-1 truncate">
+                        <code className="flex-1 truncate rounded border border-[var(--adm-border)] bg-[var(--adm-surface-alt)] px-2 py-1 font-mono text-xs text-[var(--adm-text)]">
                           {pubData.user.id}
                         </code>
                         <button
                           onClick={() => copyId(pubData.user.id, 'Publisher')}
-                          className="p-1 hover:bg-muted rounded"
+                          className="rounded p-1 text-[var(--adm-muted)] transition-colors hover:bg-[var(--adm-hover)] hover:text-[var(--adm-text)]"
                         >
                           <Copy size={16} />
                         </button>
@@ -109,20 +119,20 @@ export default function AdminDirectory() {
                       </a>
                     )}
 
-                    <div className="pt-4 border-t space-y-2">
+                    <div className="space-y-2 border-t border-[var(--adm-border)] pt-4">
                       <div className="flex justify-between text-sm">
-                        <span className="text-muted-foreground">Status</span>
-                        <span className={`font-medium ${pubData.user.status === 'approved' ? 'text-primary' : 'text-muted-foreground'}`}>
+                        <span className="text-[var(--adm-muted)]">Status</span>
+                        <span className={`font-medium ${pubData.user.status === 'approved' ? 'text-primary' : 'text-[var(--adm-muted)]'}`}>
                           {pubData.user.status.toUpperCase()}
                         </span>
                       </div>
                       <div className="flex justify-between text-sm">
-                        <span className="text-muted-foreground">Campaigns</span>
+                        <span className="text-[var(--adm-muted)]">Campaigns</span>
                         <span className="font-mono font-bold">{pubData.campaigns_count}</span>
                       </div>
                       {pubData.profile && (
                         <div className="flex justify-between text-sm">
-                          <span className="text-muted-foreground">Monthly Traffic</span>
+                          <span className="text-[var(--adm-muted)]">Monthly Traffic</span>
                           <span className="font-mono">{pubData.profile.monthly_sessions.toLocaleString()}</span>
                         </div>
                       )}
@@ -135,15 +145,15 @@ export default function AdminDirectory() {
 
           <TabsContent value="brands">
             {brands.length === 0 ? (
-              <div className="bg-white rounded-lg border p-12 text-center">
-                <p className="text-muted-foreground">No brands yet</p>
+              <div className="rounded-lg border border-[var(--adm-border)] bg-[var(--adm-surface)] p-12 text-center">
+                <p className="text-[var(--adm-muted)]">No brands yet</p>
               </div>
             ) : (
               <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {brands.map((brandData) => (
                   <div
                     key={brandData.user.id}
-                    className="bg-white rounded-lg border p-6 hover:shadow-lg transition-shadow"
+                    className="rounded-lg border border-[var(--adm-border)] bg-[var(--adm-surface)] p-6 transition-shadow hover:shadow-lg"
                     data-testid={`brand-${brandData.user.id}`}
                   >
                     {brandData.profile?.logo_url ? (
@@ -153,24 +163,24 @@ export default function AdminDirectory() {
                         className="h-16 w-16 object-contain rounded mb-4"
                       />
                     ) : (
-                      <div className="h-16 w-16 rounded bg-muted flex items-center justify-center mb-4">
+                      <div className="mb-4 flex h-16 w-16 items-center justify-center rounded bg-[var(--adm-surface-alt)]">
                         <Buildings size={32} className="text-primary" />
                       </div>
                     )}
 
-                    <h3 className="font-heading text-xl font-bold text-foreground mb-2">
+                    <h3 className="mb-2 font-heading text-xl font-bold text-[var(--adm-text)]">
                       {brandData.profile?.company_name || brandData.user.email}
                     </h3>
 
                     <div className="mb-4">
-                      <div className="text-xs text-muted-foreground mb-1">Brand ID</div>
+                      <div className="mb-1 text-xs text-[var(--adm-muted)]">Brand ID</div>
                       <div className="flex items-center gap-2">
-                        <code className="text-xs bg-muted px-2 py-1 rounded flex-1 truncate">
+                        <code className="flex-1 truncate rounded border border-[var(--adm-border)] bg-[var(--adm-surface-alt)] px-2 py-1 font-mono text-xs text-[var(--adm-text)]">
                           {brandData.user.id}
                         </code>
                         <button
                           onClick={() => copyId(brandData.user.id, 'Brand')}
-                          className="p-1 hover:bg-muted rounded"
+                          className="rounded p-1 text-[var(--adm-muted)] transition-colors hover:bg-[var(--adm-hover)] hover:text-[var(--adm-text)]"
                         >
                           <Copy size={16} />
                         </button>
@@ -178,7 +188,7 @@ export default function AdminDirectory() {
                     </div>
 
                     {brandData.profile?.industry && (
-                      <p className="text-sm text-muted-foreground mb-4">{brandData.profile.industry}</p>
+                      <p className="mb-4 text-sm text-[var(--adm-muted)]">{brandData.profile.industry}</p>
                     )}
 
                     {brandData.profile?.website && (
@@ -192,15 +202,15 @@ export default function AdminDirectory() {
                       </a>
                     )}
 
-                    <div className="pt-4 border-t space-y-2">
+                    <div className="space-y-2 border-t border-[var(--adm-border)] pt-4">
                       <div className="flex justify-between text-sm">
-                        <span className="text-muted-foreground">Status</span>
-                        <span className={`font-medium ${brandData.user.status === 'approved' ? 'text-primary' : 'text-muted-foreground'}`}>
+                        <span className="text-[var(--adm-muted)]">Status</span>
+                        <span className={`font-medium ${brandData.user.status === 'approved' ? 'text-primary' : 'text-[var(--adm-muted)]'}`}>
                           {brandData.user.status.toUpperCase()}
                         </span>
                       </div>
                       <div className="flex justify-between text-sm">
-                        <span className="text-muted-foreground">Campaigns</span>
+                        <span className="text-[var(--adm-muted)]">Campaigns</span>
                         <span className="font-mono font-bold">{brandData.campaigns_count}</span>
                       </div>
                     </div>
