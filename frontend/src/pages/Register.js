@@ -86,8 +86,7 @@ export default function Register() {
 
         <div className="pr-left-mid">
           <button type="button" className="pr-logo pr-logo-center" onClick={() => navigate('/')}>
-            <div className="pr-logo-mark">T</div>
-            <span className="pr-logo-name">TMOE</span>
+            <img src="/tmoe-logo.png" alt="TMOE" className="pr-logo-img" />
           </button>
           <p className="pr-left-eyebrow">Technology Partnerships</p>
           <h1 className="pr-left-title">Partner Registration. Join the TMOE Network.</h1>
@@ -119,20 +118,6 @@ export default function Register() {
           </div>
         </div>
 
-        <div className="pr-left-steps">
-          <div className={`pr-step ${!submitted ? 'done' : ''}`}>
-            <div className="pr-step-circle">1</div>
-            <span className="pr-step-lbl">Create your profile</span>
-          </div>
-          <div className={`pr-step ${submitted ? 'done' : ''}`}>
-            <div className="pr-step-circle">2</div>
-            <span className="pr-step-lbl">Team reviews application</span>
-          </div>
-          <div className="pr-step">
-            <div className="pr-step-circle">3</div>
-            <span className="pr-step-lbl">Go live on the network</span>
-          </div>
-        </div>
       </div>
 
       <div className="pr-right">
@@ -330,12 +315,6 @@ export default function Register() {
                 </button>
               </form>
 
-              <p className="pr-ftr">
-                Already registered?{' '}
-                <button type="button" className="pr-ftr-link" onClick={() => navigate('/login')} data-testid="go-to-login-link">
-                  Sign in
-                </button>
-              </p>
             </div>
           ) : (
             <div className="pr-ty">
@@ -344,7 +323,7 @@ export default function Register() {
               </div>
               <div className="pr-ty-pill"><span className="pr-ty-pill-dot" />Application received</div>
               <h2 className="pr-ty-h">Thank you for registering.</h2>
-              <p className="pr-ty-p">We have sent a confirmation email and our team typically responds within 2-3 business days.</p>
+              <p className="pr-ty-p">We'll let you know once our platform is live and your profile has been reviewed.</p>
               <button type="button" className="pr-btn-again" onClick={resetForm}>
                 <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path d="M19 12H5m7-7-7 7 7 7" /></svg>
                 Register another profile

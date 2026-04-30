@@ -71,30 +71,17 @@
 .pr-logo {
   display: inline-flex;
   align-items: center;
-  gap: 9px;
   text-decoration: none;
   background: transparent;
   border: 0;
   cursor: pointer;
+  padding: 0;
 }
 
-.pr-logo-mark {
-  width: 30px;
-  height: 30px;
-  background: rgba(255, 255, 255, 0.95);
-  border-radius: 6px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 13px;
-  font-weight: 900;
-  color: #0d0c09;
-}
-
-.pr-logo-name {
-  font-size: 15px;
-  font-weight: 800;
-  color: #fff;
+.pr-logo-img {
+  width: 95px;
+  height: auto;
+  display: block;
 }
 
 .pr-left-mid {
@@ -359,8 +346,8 @@ textarea.pr-fi {
   width: 100%;
   margin-top: 6px;
   padding: 13px;
-  background: #fff;
-  color: #0d0c09;
+  background: #E8501AF2;
+  color: #fff;
   border: none;
   border-radius: 8px;
   font-size: 14px;
