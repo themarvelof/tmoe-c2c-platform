@@ -1,34 +1,31 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { toast } from 'sonner';
+import './Register.css';
+
+const initialFormState = {
+  email: '',
+  role: 'publisher',
+  company_name: '',
+  website: '',
+  industry: '',
+  description: '',
+  target_categories: '',
+  target_markets: '',
+  commerce_links: '',
+  name: '',
+  categories: '',
+  monthly_sessions: 0,
+  monthly_pageviews: 0
+};
 
 export default function Register() {
   const navigate = useNavigate();
   const { register } = useAuth();
-  const [formData, setFormData] = useState({
-    email: '',
-    role: '',
-    company_name: '',
-    website: '',
-    industry: '',
-    description: '',
-    target_categories: '',
-    target_markets: '',
-    commerce_links: '',
-    name: '',
-    categories: '',
-    monthly_sessions: 0,
-    monthly_pageviews: 0
-  });
+  const [formData, setFormData] = useState(initialFormState);
   const [loading, setLoading] = useState(false);
-  const [showSuccessPopup, setShowSuccessPopup] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -59,8 +56,7 @@ export default function Register() {
       }
 
       await register(payload);
-      toast.success('Registration successful! Awaiting admin approval.');
-      setShowSuccessPopup(true);
+      setSubmitted(true);
     } catch (error) {
       toast.error(error.response?.data?.detail || 'Registration failed');
     } finally {
@@ -68,251 +64,295 @@ export default function Register() {
     }
   };
 
+  const switchRole = (role) => {
+    if (loading || formData.role === role) return;
+    setFormData((prev) => ({ ...prev, role }));
+  };
+
+  const resetForm = () => {
+    setSubmitted(false);
+    setFormData((prev) => ({
+      ...initialFormState,
+      role: prev.role
+    }));
+  };
+
   return (
-    <div className="min-h-screen grid lg:grid-cols-2">
-      <Dialog
-        open={showSuccessPopup}
-        onOpenChange={(open) => {
-          setShowSuccessPopup(open);
-          if (!open) {
-            navigate('/login');
-          }
-        }}
-      >
-        <DialogContent className="max-w-md text-center">
-          <DialogHeader>
-            <DialogTitle className="text-2xl">Successfully Registered</DialogTitle>
-            <DialogDescription>
-              Your account has been created. We have triggered a confirmation email to your registered address.
-            </DialogDescription>
-          </DialogHeader>
-        </DialogContent>
-      </Dialog>
+    <div className={`partner-register-page ${formData.role === 'brand' ? 'brand-mode' : ''}`}>
+      <div className="pr-left">
+        <div className="pr-g-pub" />
+        <div className="pr-g-brand" />
+        <div className="pr-grain" />
 
-      {/* Left - Form */}
-      <div className="flex items-center justify-center p-8">
-        <div className="w-full max-w-md">
-          <div className="mb-8">
-            <h1 className="font-heading text-4xl font-bold mb-2">Get Started</h1>
-            <p className="text-muted-foreground">Create your TMOE account</p>
+        <div className="pr-left-mid">
+          <button type="button" className="pr-logo pr-logo-center" onClick={() => navigate('/')}>
+            <div className="pr-logo-mark">T</div>
+            <span className="pr-logo-name">TMOE</span>
+          </button>
+          <p className="pr-left-eyebrow">Technology Partnerships</p>
+          <h1 className="pr-left-title">Partner Registration. Join the TMOE Network.</h1>
+          <p className="pr-left-sub">Create your partner profile to get started. Our team reviews every application and will be in touch shortly.</p>
+
+          <div className="pr-toggle-wrap">
+            <label className={`pr-radio-row ${formData.role === 'publisher' ? 'active' : ''}`}>
+              <input
+                type="radio"
+                name="role"
+                checked={formData.role === 'publisher'}
+                onChange={() => switchRole('publisher')}
+                data-testid="role-publisher"
+              />
+              <span className="pr-radio-dot" />
+              <span>Publisher</span>
+            </label>
+            <label className={`pr-radio-row ${formData.role === 'brand' ? 'active' : ''}`}>
+              <input
+                type="radio"
+                name="role"
+                checked={formData.role === 'brand'}
+                onChange={() => switchRole('brand')}
+                data-testid="role-brand"
+              />
+              <span className="pr-radio-dot" />
+              <span>Brand</span>
+            </label>
           </div>
+        </div>
 
-          <form onSubmit={handleSubmit} className="space-y-6" data-testid="register-form">
-            <div>
-              <Label htmlFor="role">I am a</Label>
-              <Select
-                value={formData.role}
-                onValueChange={(value) => setFormData({ ...formData, role: value })}
-                required
-              >
-                <SelectTrigger className="mt-1 border-foreground" data-testid="role-select">
-                  <SelectValue placeholder="Select your role" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="publisher" data-testid="role-publisher">Publisher</SelectItem>
-                  <SelectItem value="brand" data-testid="role-brand">Brand</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div>
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                required
-                data-testid="register-email-input"
-                className="mt-1 border-foreground"
-              />
-            </div>
-
-            <div>
-              <Label htmlFor="company_name">Company Name</Label>
-              <Input
-                id="company_name"
-                value={formData.company_name}
-                onChange={(e) => setFormData({ ...formData, company_name: e.target.value })}
-                required={formData.role === 'brand'}
-                data-testid="register-company-input"
-                className="mt-1 border-foreground"
-              />
-            </div>
-
-            <div>
-              <Label htmlFor="website">Website</Label>
-              <Input
-                id="website"
-                type="url"
-                value={formData.website}
-                onChange={(e) => setFormData({ ...formData, website: e.target.value })}
-                required={formData.role === 'brand' || formData.role === 'publisher'}
-                placeholder="https://"
-                data-testid="register-website-input"
-                className="mt-1 border-foreground"
-              />
-            </div>
-
-            {formData.role === 'brand' && (
-              <>
-                <div>
-                  <Label htmlFor="industry">Industry</Label>
-                  <Input
-                    id="industry"
-                    value={formData.industry}
-                    onChange={(e) => setFormData({ ...formData, industry: e.target.value })}
-                    required
-                    className="mt-1 border-foreground"
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="description">Description</Label>
-                  <Textarea
-                    id="description"
-                    value={formData.description}
-                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                    required
-                    rows={4}
-                    className="mt-1 border-foreground"
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="target_categories">Target Categories (comma-separated)</Label>
-                  <Input
-                    id="target_categories"
-                    value={formData.target_categories}
-                    onChange={(e) => setFormData({ ...formData, target_categories: e.target.value })}
-                    placeholder="Technology, Fashion, Lifestyle"
-                    required
-                    className="mt-1 border-foreground"
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="target_markets">Target Markets (comma-separated)</Label>
-                  <Input
-                    id="target_markets"
-                    value={formData.target_markets}
-                    onChange={(e) => setFormData({ ...formData, target_markets: e.target.value })}
-                    placeholder="US, UK, India"
-                    required
-                    className="mt-1 border-foreground"
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="commerce_links">Commerce Links (comma-separated)</Label>
-                  <Input
-                    id="commerce_links"
-                    value={formData.commerce_links}
-                    onChange={(e) => setFormData({ ...formData, commerce_links: e.target.value })}
-                    placeholder="https://shop.example.com, https://amazon.com/brand"
-                    className="mt-1 border-foreground"
-                  />
-                </div>
-              </>
-            )}
-
-            {formData.role === 'publisher' && (
-              <>
-                <div>
-                  <Label htmlFor="name">Publisher Name</Label>
-                  <Input
-                    id="name"
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    required
-                    className="mt-1 border-foreground"
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="categories">Content Categories (comma-separated)</Label>
-                  <Input
-                    id="categories"
-                    value={formData.categories}
-                    onChange={(e) => setFormData({ ...formData, categories: e.target.value })}
-                    placeholder="Technology, Fashion, Lifestyle"
-                    required
-                    className="mt-1 border-foreground"
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="description">Description</Label>
-                  <Textarea
-                    id="description"
-                    value={formData.description}
-                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                    required
-                    rows={4}
-                    className="mt-1 border-foreground"
-                  />
-                </div>
-
-                <div className="grid md:grid-cols-2 gap-6">
-                  <div>
-                    <Label htmlFor="monthly_sessions">Monthly Sessions</Label>
-                    <Input
-                      id="monthly_sessions"
-                      type="number"
-                      value={formData.monthly_sessions}
-                      onChange={(e) => setFormData({ ...formData, monthly_sessions: e.target.value })}
-                      required
-                      className="mt-1 border-foreground"
-                    />
-                  </div>
-
-                  <div>
-                    <Label htmlFor="monthly_pageviews">Monthly Pageviews</Label>
-                    <Input
-                      id="monthly_pageviews"
-                      type="number"
-                      value={formData.monthly_pageviews}
-                      onChange={(e) => setFormData({ ...formData, monthly_pageviews: e.target.value })}
-                      required
-                      className="mt-1 border-foreground"
-                    />
-                  </div>
-                </div>
-              </>
-            )}
-
-            <Button
-              type="submit"
-              disabled={loading || !formData.role}
-              className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
-              data-testid="register-submit-button"
-            >
-              {loading ? 'Creating account...' : 'Create Account'}
-            </Button>
-          </form>
-
-          <div className="mt-6 text-center">
-            <p className="text-sm text-muted-foreground">
-              Already have an account?{' '}
-              <button
-                onClick={() => navigate('/login')}
-                className="text-primary hover:underline"
-                data-testid="go-to-login-link"
-              >
-                Sign in
-              </button>
-            </p>
+        <div className="pr-left-steps">
+          <div className={`pr-step ${!submitted ? 'done' : ''}`}>
+            <div className="pr-step-circle">1</div>
+            <span className="pr-step-lbl">Create your profile</span>
+          </div>
+          <div className={`pr-step ${submitted ? 'done' : ''}`}>
+            <div className="pr-step-circle">2</div>
+            <span className="pr-step-lbl">Team reviews application</span>
+          </div>
+          <div className="pr-step">
+            <div className="pr-step-circle">3</div>
+            <span className="pr-step-lbl">Go live on the network</span>
           </div>
         </div>
       </div>
 
-      {/* Right - Image */}
-      <div
-        className="hidden lg:block bg-cover bg-center border-l border-foreground"
-        style={{
-          backgroundImage: 'url(https://images.pexels.com/photos/62693/pexels-photo-62693.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940)'
-        }}
-      />
+      <div className="pr-right">
+        <div className="pr-right-inner">
+          {!submitted ? (
+            <div className="pr-form-view">
+              <h2 className="pr-form-h">{formData.role === 'publisher' ? 'Publisher Profile' : 'Brand Profile'}</h2>
+              <p className="pr-form-sub2">Fill in your details. Our team reviews every application personally.</p>
+
+              <form onSubmit={handleSubmit} data-testid="register-form">
+                <div className="pr-fr">
+                  <label className="pr-lbl" htmlFor="email">Email *</label>
+                  <input
+                    id="email"
+                    className="pr-fi"
+                    type="email"
+                    required
+                    value={formData.email}
+                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                    placeholder="you@company.com"
+                    data-testid="register-email-input"
+                  />
+                </div>
+
+                {formData.role === 'publisher' ? (
+                  <>
+                    <div className="pr-fr">
+                      <label className="pr-lbl" htmlFor="name">Publisher Name *</label>
+                      <input
+                        id="name"
+                        className="pr-fi"
+                        type="text"
+                        required
+                        value={formData.name}
+                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                        placeholder="e.g. The Indian Express"
+                      />
+                    </div>
+                    <div className="pr-fr">
+                      <label className="pr-lbl" htmlFor="website">Website URL *</label>
+                      <input
+                        id="website"
+                        className="pr-fi"
+                        type="url"
+                        required
+                        value={formData.website}
+                        onChange={(e) => setFormData({ ...formData, website: e.target.value })}
+                        placeholder="https://yourpublication.com"
+                        data-testid="register-website-input"
+                      />
+                    </div>
+                    <div className="pr-fr">
+                      <label className="pr-lbl" htmlFor="categories">Content Categories <span className="pr-hint">comma-separated</span></label>
+                      <input
+                        id="categories"
+                        className="pr-fi"
+                        type="text"
+                        value={formData.categories}
+                        onChange={(e) => setFormData({ ...formData, categories: e.target.value })}
+                        placeholder="Technology, Fashion, Lifestyle"
+                      />
+                    </div>
+                    <div className="pr-fr">
+                      <label className="pr-lbl" htmlFor="description">Description *</label>
+                      <textarea
+                        id="description"
+                        className="pr-fi"
+                        required
+                        rows={4}
+                        value={formData.description}
+                        onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                        placeholder="Tell us about your publication — audience, reach, editorial focus..."
+                      />
+                    </div>
+                    <div className="pr-fr2">
+                      <div>
+                        <label className="pr-lbl" htmlFor="monthly_sessions">Monthly Sessions</label>
+                        <input
+                          id="monthly_sessions"
+                          className="pr-fi"
+                          type="number"
+                          min="0"
+                          value={formData.monthly_sessions}
+                          onChange={(e) => setFormData({ ...formData, monthly_sessions: e.target.value })}
+                          placeholder="0"
+                        />
+                      </div>
+                      <div>
+                        <label className="pr-lbl" htmlFor="monthly_pageviews">Monthly Pageviews</label>
+                        <input
+                          id="monthly_pageviews"
+                          className="pr-fi"
+                          type="number"
+                          min="0"
+                          value={formData.monthly_pageviews}
+                          onChange={(e) => setFormData({ ...formData, monthly_pageviews: e.target.value })}
+                          placeholder="0"
+                        />
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="pr-fr">
+                      <label className="pr-lbl" htmlFor="company_name">Company Name *</label>
+                      <input
+                        id="company_name"
+                        className="pr-fi"
+                        type="text"
+                        required
+                        value={formData.company_name}
+                        onChange={(e) => setFormData({ ...formData, company_name: e.target.value })}
+                        placeholder="e.g. Acme Commerce Ltd."
+                        data-testid="register-company-input"
+                      />
+                    </div>
+                    <div className="pr-fr">
+                      <label className="pr-lbl" htmlFor="website">Website URL *</label>
+                      <input
+                        id="website"
+                        className="pr-fi"
+                        type="url"
+                        required
+                        value={formData.website}
+                        onChange={(e) => setFormData({ ...formData, website: e.target.value })}
+                        placeholder="https://yourbrand.com"
+                        data-testid="register-website-input"
+                      />
+                    </div>
+                    <div className="pr-fr">
+                      <label className="pr-lbl" htmlFor="industry">Industry *</label>
+                      <input
+                        id="industry"
+                        className="pr-fi"
+                        type="text"
+                        required
+                        value={formData.industry}
+                        onChange={(e) => setFormData({ ...formData, industry: e.target.value })}
+                        placeholder="e.g. Fashion, Electronics, Beauty"
+                      />
+                    </div>
+                    <div className="pr-fr">
+                      <label className="pr-lbl" htmlFor="description">Description *</label>
+                      <textarea
+                        id="description"
+                        className="pr-fi"
+                        required
+                        rows={4}
+                        value={formData.description}
+                        onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                        placeholder="Tell us about your brand — products, markets, goals..."
+                      />
+                    </div>
+                    <div className="pr-fr">
+                      <label className="pr-lbl" htmlFor="target_categories">Target Categories <span className="pr-hint">comma-separated</span></label>
+                      <input
+                        id="target_categories"
+                        className="pr-fi"
+                        type="text"
+                        value={formData.target_categories}
+                        onChange={(e) => setFormData({ ...formData, target_categories: e.target.value })}
+                        placeholder="Technology, Fashion, Lifestyle"
+                      />
+                    </div>
+                    <div className="pr-fr">
+                      <label className="pr-lbl" htmlFor="target_markets">Target Markets <span className="pr-hint">comma-separated</span></label>
+                      <input
+                        id="target_markets"
+                        className="pr-fi"
+                        type="text"
+                        value={formData.target_markets}
+                        onChange={(e) => setFormData({ ...formData, target_markets: e.target.value })}
+                        placeholder="India, UAE, Indonesia"
+                      />
+                    </div>
+                    <div className="pr-fr">
+                      <label className="pr-lbl" htmlFor="commerce_links">Commerce Links <span className="pr-hint">comma-separated</span></label>
+                      <input
+                        id="commerce_links"
+                        className="pr-fi"
+                        type="text"
+                        value={formData.commerce_links}
+                        onChange={(e) => setFormData({ ...formData, commerce_links: e.target.value })}
+                        placeholder="https://shop.example.com, https://amazon.com/brand"
+                      />
+                    </div>
+                  </>
+                )}
+
+                <button className="pr-btn-go" type="submit" disabled={loading} data-testid="register-submit-button">
+                  {loading ? 'Submitting...' : formData.role === 'publisher' ? 'Create Publisher Profile' : 'Create Brand Profile'}
+                  <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                    <path d="M5 12h14m-7-7 7 7-7 7" />
+                  </svg>
+                </button>
+              </form>
+
+              <p className="pr-ftr">
+                Already registered?{' '}
+                <button type="button" className="pr-ftr-link" onClick={() => navigate('/login')} data-testid="go-to-login-link">
+                  Sign in
+                </button>
+              </p>
+            </div>
+          ) : (
+            <div className="pr-ty">
+              <div className="pr-ty-icon">
+                <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12" /></svg>
+              </div>
+              <div className="pr-ty-pill"><span className="pr-ty-pill-dot" />Application received</div>
+              <h2 className="pr-ty-h">Thank you for registering.</h2>
+              <p className="pr-ty-p">We have sent a confirmation email and our team typically responds within 2-3 business days.</p>
+              <button type="button" className="pr-btn-again" onClick={resetForm}>
+                <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path d="M19 12H5m7-7-7 7 7 7" /></svg>
+                Register another profile
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

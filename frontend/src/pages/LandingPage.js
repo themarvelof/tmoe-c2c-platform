@@ -14,14 +14,14 @@ export default function LandingPage() {
             TMOE
           </div>
           <div className="flex gap-4">
-            <Button
+            {/* <Button
               variant="ghost"
               onClick={() => navigate('/login')}
               data-testid="header-login-button"
               className="hover:bg-muted"
             >
               Login
-            </Button>
+            </Button> */}
             <Button
               onClick={() => navigate('/register')}
               data-testid="header-register-button"
