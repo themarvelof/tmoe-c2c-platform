@@ -9,11 +9,10 @@ import logging
 import csv
 import io
 import json
-import smtplib
 import hashlib
 import hmac
 import openpyxl
-from email.message import EmailMessage
+import requests
 from pathlib import Path
 from pydantic import BaseModel, Field, ConfigDict, EmailStr
 from typing import List, Optional, Dict, Any
@@ -462,39 +461,55 @@ def verify_password(password: str, stored: str) -> bool:
     except Exception:
         return False
 
-def send_registration_email(recipient_email: str, role: str) -> None:
-    """Send signup acknowledgement email when SMTP is configured."""
-    smtp_host = (os.environ.get("SMTP_HOST") or "").strip()
-    smtp_port = int((os.environ.get("SMTP_PORT") or "587").strip())
-    smtp_user = (os.environ.get("SMTP_USER") or "").strip()
-    smtp_password = (os.environ.get("SMTP_PASSWORD") or "").strip()
-    smtp_from = (os.environ.get("SMTP_FROM_EMAIL") or smtp_user or "no-reply@tmoe.local").strip()
-    use_tls = (os.environ.get("SMTP_USE_TLS") or "true").strip().lower() in ("1", "true", "yes")
+def send_email(to_email: str, subject: str, html_content: str) -> bool:
+    """
+    Send email using Brevo transactional email API.
+    Returns True on success, False otherwise.
+    """
+    api_key = (os.environ.get("BREVO_API_KEY") or "").strip()
+    if not api_key:
+        logger.warning("Email skipped for %s: BREVO_API_KEY missing", to_email)
+        return False
 
-    if not smtp_host:
-        logger.warning("Registration email skipped for %s: SMTP_HOST missing", recipient_email)
-        return
-
-    msg = EmailMessage()
-    msg["Subject"] = "Successfully Registered - TMOE"
-    msg["From"] = smtp_from
-    msg["To"] = recipient_email
-    msg.set_content(
-        f"Hi,\n\n"
-        f"You have successfully registered on TMOE as a {role}.\n"
-        f"Your account is awaiting admin approval.\n\n"
-        f"Thanks,\nTMOE Team"
-    )
+    sender_email = (os.environ.get("BREVO_SENDER_EMAIL") or "no-reply@tmoe.local").strip()
+    sender_name = (os.environ.get("BREVO_SENDER_NAME") or "TMOE").strip()
+    url = "https://api.brevo.com/v3/smtp/email"
+    headers = {
+        "accept": "application/json",
+        "api-key": api_key,
+        "content-type": "application/json",
+    }
+    payload = {
+        "sender": {"name": sender_name, "email": sender_email},
+        "to": [{"email": to_email}],
+        "subject": subject,
+        "htmlContent": html_content,
+    }
 
     try:
-        with smtplib.SMTP(smtp_host, smtp_port, timeout=20) as server:
-            if use_tls:
-                server.starttls()
-            if smtp_user and smtp_password:
-                server.login(smtp_user, smtp_password)
-            server.send_message(msg)
-    except Exception as exc:
-        logger.warning("Failed to send registration email to %s: %s", recipient_email, exc)
+        response = requests.post(url, headers=headers, json=payload, timeout=20)
+        if response.status_code >= 400:
+            logger.error(
+                "Brevo email failed to %s (status=%s): %s",
+                to_email,
+                response.status_code,
+                response.text[:1000],
+            )
+            return False
+        return True
+    except requests.RequestException as exc:
+        logger.exception("Brevo email request failed for %s: %s", to_email, exc)
+        return False
+
+def send_registration_email(recipient_email: str, role: str) -> bool:
+    subject = "Successfully Registered - TMOE"
+    html_content = (
+        "<p>Hi,</p>"
+        f"<p>You have successfully registered on TMOE as a <strong>{role}</strong>.</p>"
+        "<p>Your account is awaiting admin approval.</p>"
+        "<p>Thanks,<br/>TMOE Team</p>"
+    )
+    return send_email(recipient_email, subject, html_content)
 
 SEED_ACCOUNT_PASSWORDS = {
     "admin@tmoe.com": "Admin@123",
