@@ -4,31 +4,63 @@ import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { toast } from 'sonner';
-import { Eye, EyeSlash } from '@phosphor-icons/react';
 
 export default function Register() {
   const navigate = useNavigate();
   const { register } = useAuth();
   const [formData, setFormData] = useState({
     email: '',
-    password: '',
     role: '',
     company_name: '',
-    website: ''
+    website: '',
+    industry: '',
+    description: '',
+    target_categories: '',
+    target_markets: '',
+    commerce_links: '',
+    name: '',
+    categories: '',
+    monthly_sessions: 0,
+    monthly_pageviews: 0
   });
-  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [showSuccessPopup, setShowSuccessPopup] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
 
     try {
-      await register(formData);
+      const payload = {
+        email: formData.email,
+        role: formData.role,
+        website: formData.website
+      };
+
+      if (formData.role === 'brand') {
+        payload.company_name = formData.company_name;
+        payload.industry = formData.industry;
+        payload.description = formData.description;
+        payload.target_categories = formData.target_categories.split(',').map((c) => c.trim()).filter(Boolean);
+        payload.target_markets = formData.target_markets.split(',').map((m) => m.trim()).filter(Boolean);
+        payload.commerce_links = formData.commerce_links.split(',').map((l) => l.trim()).filter(Boolean);
+      }
+
+      if (formData.role === 'publisher') {
+        payload.name = formData.name;
+        payload.description = formData.description;
+        payload.categories = formData.categories.split(',').map((c) => c.trim()).filter(Boolean);
+        payload.monthly_sessions = parseInt(formData.monthly_sessions, 10) || 0;
+        payload.monthly_pageviews = parseInt(formData.monthly_pageviews, 10) || 0;
+      }
+
+      await register(payload);
       toast.success('Registration successful! Awaiting admin approval.');
-      setTimeout(() => navigate('/login'), 2000);
+      setShowSuccessPopup(true);
     } catch (error) {
       toast.error(error.response?.data?.detail || 'Registration failed');
     } finally {
@@ -38,6 +70,25 @@ export default function Register() {
 
   return (
     <div className="min-h-screen grid lg:grid-cols-2">
+      <Dialog
+        open={showSuccessPopup}
+        onOpenChange={(open) => {
+          setShowSuccessPopup(open);
+          if (!open) {
+            navigate('/login');
+          }
+        }}
+      >
+        <DialogContent className="max-w-md text-center">
+          <DialogHeader>
+            <DialogTitle className="text-2xl">Successfully Registered</DialogTitle>
+            <DialogDescription>
+              Your account has been created. We have triggered a confirmation email to your registered address.
+            </DialogDescription>
+          </DialogHeader>
+        </DialogContent>
+      </Dialog>
+
       {/* Left - Form */}
       <div className="flex items-center justify-center p-8">
         <div className="w-full max-w-md">
@@ -78,33 +129,12 @@ export default function Register() {
             </div>
 
             <div>
-              <Label htmlFor="password">Password</Label>
-              <div className="relative mt-1">
-                <Input
-                  id="password"
-                  type={showPassword ? 'text' : 'password'}
-                  value={formData.password}
-                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                  required
-                  data-testid="register-password-input"
-                  className="border-foreground pr-10"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-2 top-1/2 -translate-y-1/2"
-                >
-                  {showPassword ? <EyeSlash size={20} /> : <Eye size={20} />}
-                </button>
-              </div>
-            </div>
-
-            <div>
               <Label htmlFor="company_name">Company Name</Label>
               <Input
                 id="company_name"
                 value={formData.company_name}
                 onChange={(e) => setFormData({ ...formData, company_name: e.target.value })}
+                required={formData.role === 'brand'}
                 data-testid="register-company-input"
                 className="mt-1 border-foreground"
               />
@@ -117,11 +147,139 @@ export default function Register() {
                 type="url"
                 value={formData.website}
                 onChange={(e) => setFormData({ ...formData, website: e.target.value })}
+                required={formData.role === 'brand' || formData.role === 'publisher'}
                 placeholder="https://"
                 data-testid="register-website-input"
                 className="mt-1 border-foreground"
               />
             </div>
+
+            {formData.role === 'brand' && (
+              <>
+                <div>
+                  <Label htmlFor="industry">Industry</Label>
+                  <Input
+                    id="industry"
+                    value={formData.industry}
+                    onChange={(e) => setFormData({ ...formData, industry: e.target.value })}
+                    required
+                    className="mt-1 border-foreground"
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="description">Description</Label>
+                  <Textarea
+                    id="description"
+                    value={formData.description}
+                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                    required
+                    rows={4}
+                    className="mt-1 border-foreground"
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="target_categories">Target Categories (comma-separated)</Label>
+                  <Input
+                    id="target_categories"
+                    value={formData.target_categories}
+                    onChange={(e) => setFormData({ ...formData, target_categories: e.target.value })}
+                    placeholder="Technology, Fashion, Lifestyle"
+                    required
+                    className="mt-1 border-foreground"
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="target_markets">Target Markets (comma-separated)</Label>
+                  <Input
+                    id="target_markets"
+                    value={formData.target_markets}
+                    onChange={(e) => setFormData({ ...formData, target_markets: e.target.value })}
+                    placeholder="US, UK, India"
+                    required
+                    className="mt-1 border-foreground"
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="commerce_links">Commerce Links (comma-separated)</Label>
+                  <Input
+                    id="commerce_links"
+                    value={formData.commerce_links}
+                    onChange={(e) => setFormData({ ...formData, commerce_links: e.target.value })}
+                    placeholder="https://shop.example.com, https://amazon.com/brand"
+                    className="mt-1 border-foreground"
+                  />
+                </div>
+              </>
+            )}
+
+            {formData.role === 'publisher' && (
+              <>
+                <div>
+                  <Label htmlFor="name">Publisher Name</Label>
+                  <Input
+                    id="name"
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    required
+                    className="mt-1 border-foreground"
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="categories">Content Categories (comma-separated)</Label>
+                  <Input
+                    id="categories"
+                    value={formData.categories}
+                    onChange={(e) => setFormData({ ...formData, categories: e.target.value })}
+                    placeholder="Technology, Fashion, Lifestyle"
+                    required
+                    className="mt-1 border-foreground"
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="description">Description</Label>
+                  <Textarea
+                    id="description"
+                    value={formData.description}
+                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                    required
+                    rows={4}
+                    className="mt-1 border-foreground"
+                  />
+                </div>
+
+                <div className="grid md:grid-cols-2 gap-6">
+                  <div>
+                    <Label htmlFor="monthly_sessions">Monthly Sessions</Label>
+                    <Input
+                      id="monthly_sessions"
+                      type="number"
+                      value={formData.monthly_sessions}
+                      onChange={(e) => setFormData({ ...formData, monthly_sessions: e.target.value })}
+                      required
+                      className="mt-1 border-foreground"
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="monthly_pageviews">Monthly Pageviews</Label>
+                    <Input
+                      id="monthly_pageviews"
+                      type="number"
+                      value={formData.monthly_pageviews}
+                      onChange={(e) => setFormData({ ...formData, monthly_pageviews: e.target.value })}
+                      required
+                      className="mt-1 border-foreground"
+                    />
+                  </div>
+                </div>
+              </>
+            )}
 
             <Button
               type="submit"

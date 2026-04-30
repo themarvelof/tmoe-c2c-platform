@@ -37,7 +37,7 @@ export default function LandingPage() {
       <section className="bg-white">
         <div className="max-w-7xl mx-auto px-6 py-20">
           <div className="max-w-3xl">
-            <h1 className="font-heading font-black text-5xl lg:text-6xl tracking-tight leading-tight mb-6 text-foreground">
+            <h1 className="font-heading text-5xl lg:text-6xl tracking-tight leading-tight mb-6 text-foreground">
               Content-to-Commerce Operating System
             </h1>
             <p className="text-xl text-muted-foreground mb-8 font-body leading-relaxed">

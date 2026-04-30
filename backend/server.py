@@ -9,9 +9,11 @@ import logging
 import csv
 import io
 import json
+import smtplib
 import hashlib
 import hmac
 import openpyxl
+from email.message import EmailMessage
 from pathlib import Path
 from pydantic import BaseModel, Field, ConfigDict, EmailStr
 from typing import List, Optional, Dict, Any
@@ -73,10 +75,21 @@ class PayoutStatus(str):
 # User Models
 class UserRegister(BaseModel):
     email: EmailStr
-    password: str
+    password: Optional[str] = None
     role: str
     company_name: Optional[str] = None
     website: Optional[str] = None
+    # Brand profile fields
+    industry: Optional[str] = None
+    description: Optional[str] = None
+    target_categories: Optional[List[str]] = None
+    target_markets: Optional[List[str]] = None
+    commerce_links: Optional[List[str]] = None
+    # Publisher profile fields
+    name: Optional[str] = None
+    categories: Optional[List[str]] = None
+    monthly_sessions: Optional[int] = None
+    monthly_pageviews: Optional[int] = None
 
 class UserLogin(BaseModel):
     email: EmailStr
@@ -449,6 +462,40 @@ def verify_password(password: str, stored: str) -> bool:
     except Exception:
         return False
 
+def send_registration_email(recipient_email: str, role: str) -> None:
+    """Send signup acknowledgement email when SMTP is configured."""
+    smtp_host = (os.environ.get("SMTP_HOST") or "").strip()
+    smtp_port = int((os.environ.get("SMTP_PORT") or "587").strip())
+    smtp_user = (os.environ.get("SMTP_USER") or "").strip()
+    smtp_password = (os.environ.get("SMTP_PASSWORD") or "").strip()
+    smtp_from = (os.environ.get("SMTP_FROM_EMAIL") or smtp_user or "no-reply@tmoe.local").strip()
+    use_tls = (os.environ.get("SMTP_USE_TLS") or "true").strip().lower() in ("1", "true", "yes")
+
+    if not smtp_host:
+        logger.warning("Registration email skipped for %s: SMTP_HOST missing", recipient_email)
+        return
+
+    msg = EmailMessage()
+    msg["Subject"] = "Successfully Registered - TMOE"
+    msg["From"] = smtp_from
+    msg["To"] = recipient_email
+    msg.set_content(
+        f"Hi,\n\n"
+        f"You have successfully registered on TMOE as a {role}.\n"
+        f"Your account is awaiting admin approval.\n\n"
+        f"Thanks,\nTMOE Team"
+    )
+
+    try:
+        with smtplib.SMTP(smtp_host, smtp_port, timeout=20) as server:
+            if use_tls:
+                server.starttls()
+            if smtp_user and smtp_password:
+                server.login(smtp_user, smtp_password)
+            server.send_message(msg)
+    except Exception as exc:
+        logger.warning("Failed to send registration email to %s: %s", recipient_email, exc)
+
 SEED_ACCOUNT_PASSWORDS = {
     "admin@tmoe.com": "Admin@123",
     "abhishek@marvelof.com": "Publisher@123",
@@ -512,8 +559,10 @@ async def register(user_data: UserRegister):
     if existing:
         raise HTTPException(status_code=400, detail="Email already registered")
     
-    # Hash password
-    password_hash = hash_password(user_data.password)
+    # Hash provided password or auto-generate one when signup omits it.
+    generated_password = f"Tmoe@{uuid.uuid4().hex[:12]}"
+    raw_password = user_data.password if user_data.password else generated_password
+    password_hash = hash_password(raw_password)
     
     # Create user
     user = User(
@@ -525,6 +574,50 @@ async def register(user_data: UserRegister):
     )
     
     await db.users.insert_one(user.model_dump())
+
+    # Optionally create role-specific profile during signup when full profile data is provided.
+    if user_data.role == UserRole.BRAND:
+        if (
+            user_data.company_name
+            and user_data.website
+            and user_data.industry
+            and user_data.description
+            and user_data.target_categories
+            and user_data.target_markets
+        ):
+            brand_profile = BrandProfile(
+                user_id=user.id,
+                company_name=user_data.company_name.strip(),
+                website=user_data.website.strip(),
+                industry=user_data.industry.strip(),
+                description=user_data.description.strip(),
+                target_categories=[c.strip() for c in user_data.target_categories if str(c).strip()],
+                target_markets=[m.strip() for m in user_data.target_markets if str(m).strip()],
+                commerce_links=[l.strip() for l in (user_data.commerce_links or []) if str(l).strip()],
+            )
+            await db.brand_profiles.insert_one(brand_profile.model_dump())
+
+    if user_data.role == UserRole.PUBLISHER:
+        if (
+            user_data.name
+            and user_data.website
+            and user_data.description
+            and user_data.categories
+            and user_data.monthly_sessions is not None
+            and user_data.monthly_pageviews is not None
+        ):
+            publisher_profile = PublisherProfile(
+                user_id=user.id,
+                name=user_data.name.strip(),
+                website=user_data.website.strip(),
+                categories=[c.strip() for c in user_data.categories if str(c).strip()],
+                description=user_data.description.strip(),
+                monthly_sessions=int(user_data.monthly_sessions),
+                monthly_pageviews=int(user_data.monthly_pageviews),
+            )
+            await db.publisher_profiles.insert_one(publisher_profile.model_dump())
+
+    send_registration_email(str(user_data.email), user_data.role)
     
     return {
         "message": "Registration successful. Awaiting admin approval.",

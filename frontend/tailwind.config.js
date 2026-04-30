@@ -54,9 +54,9 @@ module.exports = {
         }
       },
       fontFamily: {
-        'heading': ['Cabinet Grotesk', 'sans-serif'],
-        'body': ['Satoshi', 'sans-serif'],
-        'mono': ['IBM Plex Mono', 'monospace']
+        'heading': ['Plus Jakarta Sans', 'Jakarta Sans', 'Cabinet Grotesk', 'sans-serif'],
+        'body': ['Plus Jakarta Sans', 'Jakarta Sans', 'Satoshi', 'sans-serif'],
+        'mono': ['Plus Jakarta Sans', 'Jakarta Sans', 'IBM Plex Mono', 'monospace']
       },
       boxShadow: {
         'brutal': '4px 4px 0px 0px rgba(0, 0, 0, 0.1)',
