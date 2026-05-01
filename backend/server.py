@@ -14,6 +14,7 @@ import hmac
 import openpyxl
 import requests
 from pathlib import Path
+from functools import lru_cache
 from pydantic import BaseModel, Field, ConfigDict, EmailStr
 from typing import List, Optional, Dict, Any
 import uuid
@@ -501,14 +502,29 @@ def send_email(to_email: str, subject: str, html_content: str) -> bool:
         logger.exception("Brevo email request failed for %s: %s", to_email, exc)
         return False
 
+@lru_cache(maxsize=2)
+def _load_registration_email_template(template_name: str) -> str:
+    template_path = ROOT_DIR / "templates" / template_name
+    try:
+        return template_path.read_text(encoding="utf-8")
+    except Exception as exc:
+        logger.warning("Could not load email template %s: %s", template_path, exc)
+        return (
+            "<p>Hi,</p>"
+            "<p>Your registration has been received by TMOE.</p>"
+            "<p>Our team will review and get back shortly.</p>"
+            "<p>Thanks,<br/>TMOE Team</p>"
+        )
+
 def send_registration_email(recipient_email: str, role: str) -> bool:
-    subject = "Successfully Registered - TMOE"
-    html_content = (
-        "<p>Hi,</p>"
-        f"<p>You have successfully registered on TMOE as a <strong>{role}</strong>.</p>"
-        "<p>Your account is awaiting admin approval.</p>"
-        "<p>Thanks,<br/>TMOE Team</p>"
+    is_brand = str(role).strip().lower() == UserRole.BRAND
+    subject = (
+        "Your brand profile is received — TMOE Network"
+        if is_brand
+        else "You're registered on the TMOE network"
     )
+    template_name = "registration_brand.html" if is_brand else "registration_publisher.html"
+    html_content = _load_registration_email_template(template_name)
     return send_email(recipient_email, subject, html_content)
 
 SEED_ACCOUNT_PASSWORDS = {
