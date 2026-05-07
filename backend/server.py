@@ -2236,6 +2236,11 @@ async def seed_admin():
     
     return {"message": "Admin user and default benchmarks created successfully"}
 
+# Lightweight health check endpoint for uptime monitors/keep-warm pings.
+@app.get("/healthz")
+async def healthz():
+    return {"status": "ok"}
+
 # Include the router in the main app
 app.include_router(api_router)
 
