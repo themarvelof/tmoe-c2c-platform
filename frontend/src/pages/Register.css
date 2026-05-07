@@ -8,7 +8,7 @@
   --text-2: rgba(255, 255, 255, 0.5);
   --text-3: rgba(255, 255, 255, 0.28);
   display: grid;
-  grid-template-columns: 420px 1fr;
+  grid-template-columns: minmax(380px, 40vw) 1fr;
   min-height: 100vh;
   background: #0a0a0a;
   color: #fff;
@@ -19,8 +19,8 @@
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
-  padding: 40px 36px 44px;
+  justify-content: center;
+  padding: 34px 40px 20px;
 }
 
 .pr-g-pub,
@@ -91,71 +91,71 @@
   justify-content: center;
   align-items: center;
   text-align: center;
-  padding: 32px 0;
+  padding: 28px 0 20px;
 }
 
 .pr-logo-center {
-  margin-bottom: 24px;
+  margin-bottom: 30px;
 }
 
 .pr-left-eyebrow {
-  font-size: 10px;
+  font-size: 14px;
   font-weight: 700;
   letter-spacing: 0.2em;
   text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.42);
+  color: rgba(255, 255, 255);
   margin-bottom: 14px;
 }
 
 .pr-left-title {
-  font-size: clamp(24px, 2.6vw, 42px);
-  font-weight: 800;
+  font-size: 32px;
+  font-weight: 600;
   color: #fff;
   letter-spacing: -1px;
-  line-height: 1.12;
+  line-height: 1.08;
   margin-bottom: 12px;
 }
 
 .pr-left-sub {
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 300;
-  color: rgba(255, 255, 255, 0.48);
-  line-height: 1.72;
-  margin-bottom: 36px;
-  max-width: 320px;
+  color: rgba(255, 255, 255);
+  line-height: 1.45;
+  margin-bottom: 30px;
+  max-width: 348px;
 }
 
 .pr-toggle-wrap {
   display: grid;
   grid-template-columns: 1fr;
-  gap: 8px;
+  gap: 12px;
   background: transparent;
   border: 0;
   border-radius: 0;
   padding: 0;
-  max-width: 280px;
+  max-width: 320px;
   width: 100%;
 }
 
 .pr-radio-row {
-  padding: 12px 14px;
-  border-radius: 8px;
+  padding: 14px 14px 14px 12px;
+  border-radius: 10px;
   font-size: 13px;
   font-weight: 500;
   color: rgba(255, 255, 255, 0.46);
   transition: all 0.25s ease;
   display: flex;
   align-items: center;
-  justify-content: flex-start;
+  justify-content: space-between;
   gap: 10px;
   cursor: pointer;
   border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(0, 0, 0, 0.22);
+  background: rgba(0, 0, 0, 0.32);
 }
 
 .pr-radio-row.active {
-  background: linear-gradient(90deg, rgba(255, 255, 255, 0.18) 0%, rgba(255, 255, 255, 0.08) 100%);
-  border-color: rgba(255, 255, 255, 0.2);
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.18) 0%, rgba(255, 255, 255, 0.11) 100%);
+  border-color: rgba(255, 255, 255, 0.22);
   color: #fff;
 }
 
@@ -164,34 +164,104 @@
 }
 
 .pr-radio-dot {
-  width: 14px;
-  height: 14px;
+  width: 17px;
+  height: 17px;
   border-radius: 50%;
-  border: 2px solid rgba(255, 255, 255, 0.28);
+  border: 2px solid rgba(255, 255, 255, 0.33);
   position: relative;
   flex-shrink: 0;
+  order: 2;
+}
+
+.pr-radio-publisher .pr-radio-dot {
+  border-color: var(--or);
+}
+
+.pr-radio-brand .pr-radio-dot {
+  border-color: var(--teal);
+}
+
+.pr-radio-row.active .pr-radio-dot {
+  border-color: transparent;
+}
+
+.pr-radio-row.active.pr-radio-publisher .pr-radio-dot {
+  background: var(--or);
+}
+
+.pr-radio-row.active.pr-radio-brand .pr-radio-dot {
+  background: var(--teal);
 }
 
 .pr-radio-row.active .pr-radio-dot::after {
   content: '';
   position: absolute;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
+  width: 8px;
+  height: 5px;
+  border-left: 2px solid #121212;
+  border-bottom: 2px solid #121212;
   top: 50%;
   left: 50%;
-  transform: translate(-46%, -50%);
-  background: currentColor;
+  transform: translate(-50%, -62%) rotate(-45deg);
 }
 
-.partner-register-page:not(.brand-mode) .pr-radio-row.active .pr-radio-dot {
-  border-color: var(--or);
-  color: var(--or);
+.pr-radio-copy {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  text-align: left;
 }
 
-.partner-register-page.brand-mode .pr-radio-row.active .pr-radio-dot {
-  border-color: var(--teal);
-  color: var(--teal);
+.pr-radio-title {
+  font-size: 16px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.95);
+}
+
+.pr-radio-sub {
+  font-size: 13px;
+  font-weight: 400;
+  color: rgba(255, 255, 255, 0.46);
+}
+
+.pr-left-foot {
+  position: relative;
+  z-index: 2;
+  margin-top: auto;
+  padding-top: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 14px;
+}
+
+.pr-left-link {
+  color: rgba(255, 255, 255, 0.78);
+  text-decoration: none;
+}
+
+.pr-left-email {
+  text-decoration: underline;
+}
+
+.pr-left-link:hover {
+  color: #fff;
+}
+
+.pr-lang {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: rgba(255, 255, 255, 0.76);
+}
+
+.pr-lang svg {
+  width: 14px;
+  height: 14px;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 1.7;
 }
 
 .pr-left-steps {
@@ -476,6 +546,15 @@ textarea.pr-fi {
 
   .pr-left {
     min-height: 300px;
+    padding: 30px 22px 18px;
+  }
+
+  .pr-left-sub {
+    font-size: 16px;
+  }
+
+  .pr-left-foot {
+    font-size: 12px;
   }
 
   .pr-right-inner {

@@ -85,15 +85,15 @@ export default function Register() {
         <div className="pr-grain" />
 
         <div className="pr-left-mid">
-          <button type="button" className="pr-logo pr-logo-center" onClick={() => navigate('/')}>
+          <button type="button" className="pr-logo pr-logo-center" onClick={() => { window.location.href = 'https://themarvelof.com'; }}>
             <img src="/tmoe-logo.png" alt="TMOE" className="pr-logo-img" />
           </button>
           <p className="pr-left-eyebrow">Technology Partnerships</p>
-          <h1 className="pr-left-title">Partner Registration. Join the TMOE Network.</h1>
+          <h1 className="pr-left-title">Partner Registration.<br />Join the TMOE Network.</h1>
           <p className="pr-left-sub">Create your partner profile to get started. Our team reviews every application and will be in touch shortly.</p>
 
           <div className="pr-toggle-wrap">
-            <label className={`pr-radio-row ${formData.role === 'publisher' ? 'active' : ''}`}>
+            <label className={`pr-radio-row pr-radio-publisher ${formData.role === 'publisher' ? 'active' : ''}`}>
               <input
                 type="radio"
                 name="role"
@@ -102,9 +102,12 @@ export default function Register() {
                 data-testid="role-publisher"
               />
               <span className="pr-radio-dot" />
-              <span>Publisher</span>
+              <span className="pr-radio-copy">
+                <span className="pr-radio-title">Publisher</span>
+                <span className="pr-radio-sub">Monetize your audience.</span>
+              </span>
             </label>
-            <label className={`pr-radio-row ${formData.role === 'brand' ? 'active' : ''}`}>
+            <label className={`pr-radio-row pr-radio-brand ${formData.role === 'brand' ? 'active' : ''}`}>
               <input
                 type="radio"
                 name="role"
@@ -113,9 +116,25 @@ export default function Register() {
                 data-testid="role-brand"
               />
               <span className="pr-radio-dot" />
-              <span>Brand</span>
+              <span className="pr-radio-copy">
+                <span className="pr-radio-title">Brand</span>
+                <span className="pr-radio-sub">Scale content commerce.</span>
+              </span>
             </label>
           </div>
+        </div>
+
+        <div className="pr-left-foot">
+          <a className="pr-left-link" href="mailto:partner@marvelof.com">
+            Write to us at <span className="pr-left-email">Partner@marvelof.com</span>
+          </a>
+          {/* <div className="pr-lang">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <circle cx="12" cy="12" r="9" />
+              <path d="M3 12h18M12 3c2.8 2.4 4.4 5.6 4.4 9S14.8 18.6 12 21M12 3c-2.8 2.4-4.4 5.6-4.4 9S9.2 18.6 12 21" />
+            </svg>
+            <span>en</span>
+          </div> */}
         </div>
 
       </div>
