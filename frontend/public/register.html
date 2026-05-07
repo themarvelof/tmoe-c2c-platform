@@ -1,0 +1,680 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TMOE Partner Registration</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: #0a0a0a;
+      color: #fff;
+    }
+    .partner-register-page {
+      --or: #e8501a;
+      --teal: #0ea5c0;
+      --panel: #111110;
+      --field: #1a1918;
+      --border-f: rgba(255, 255, 255, 0.1);
+      --text-1: #ffffff;
+      --text-2: rgba(255, 255, 255, 0.5);
+      --text-3: rgba(255, 255, 255, 0.28);
+      display: grid;
+      grid-template-columns: minmax(380px, 40vw) 1fr;
+      min-height: 100vh;
+      background: #0a0a0a;
+    }
+    .pr-left {
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding: 34px 40px 20px;
+    }
+    .pr-g-pub, .pr-g-brand {
+      position: absolute;
+      inset: 0;
+      transition: opacity 0.7s ease;
+    }
+    .pr-g-pub {
+      background:
+        radial-gradient(ellipse 120% 55% at 50% -8%, rgba(232, 80, 26, 0.85) 0%, rgba(232, 80, 26, 0.35) 34%, transparent 68%),
+        radial-gradient(ellipse 75% 58% at 50% 34%, rgba(0, 0, 0, 0.78) 0%, rgba(0, 0, 0, 0.96) 62%, rgba(0, 0, 0, 1) 100%),
+        linear-gradient(180deg, #1a0c08 0%, #07090c 55%, #040507 100%);
+    }
+    .pr-g-brand {
+      background:
+        radial-gradient(ellipse 120% 55% at 50% -8%, rgba(14, 165, 192, 0.82) 0%, rgba(14, 165, 192, 0.34) 34%, transparent 68%),
+        radial-gradient(ellipse 75% 58% at 50% 34%, rgba(0, 0, 0, 0.78) 0%, rgba(0, 0, 0, 0.96) 62%, rgba(0, 0, 0, 1) 100%),
+        linear-gradient(180deg, #071318 0%, #070b0f 55%, #040507 100%);
+      opacity: 0;
+    }
+    .partner-register-page.brand-mode .pr-g-pub { opacity: 0; }
+    .partner-register-page.brand-mode .pr-g-brand { opacity: 1; }
+    .pr-grain {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.07'/%3E%3C/svg%3E");
+      opacity: 0.55;
+    }
+    .pr-left-mid, .pr-left-foot { position: relative; z-index: 2; }
+    .pr-logo {
+      display: inline-flex;
+      align-items: center;
+      text-decoration: none;
+      background: transparent;
+      border: 0;
+      cursor: pointer;
+      padding: 0;
+    }
+    .pr-logo-img {
+      width: 95px;
+      height: auto;
+      display: block;
+    }
+    .pr-left-mid {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+      padding: 28px 0 20px;
+    }
+    .pr-logo-center { margin-bottom: 30px; }
+    .pr-left-eyebrow {
+      font-size: 14px;
+      font-weight: 700;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      margin-bottom: 14px;
+    }
+    .pr-left-title {
+      font-size: 32px;
+      font-weight: 600;
+      letter-spacing: -1px;
+      line-height: 1.08;
+      margin-bottom: 12px;
+    }
+    .pr-left-sub {
+      font-size: 14px;
+      font-weight: 300;
+      line-height: 1.45;
+      margin-bottom: 30px;
+      max-width: 348px;
+    }
+    .pr-toggle-wrap {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 12px;
+      max-width: 320px;
+      width: 100%;
+    }
+    .pr-radio-row {
+      padding: 14px 14px 14px 12px;
+      border-radius: 10px;
+      font-size: 13px;
+      font-weight: 500;
+      color: rgba(255, 255, 255, 0.46);
+      transition: all 0.25s ease;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      cursor: pointer;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      background: rgba(0, 0, 0, 0.32);
+    }
+    .pr-radio-row.active {
+      background: linear-gradient(90deg, rgba(255, 255, 255, 0.18) 0%, rgba(255, 255, 255, 0.11) 100%);
+      border-color: rgba(255, 255, 255, 0.22);
+      color: #fff;
+    }
+    .pr-radio-row input { display: none; }
+    .pr-radio-dot {
+      width: 17px;
+      height: 17px;
+      border-radius: 50%;
+      border: 2px solid rgba(255, 255, 255, 0.33);
+      position: relative;
+      flex-shrink: 0;
+      order: 2;
+    }
+    .pr-radio-publisher .pr-radio-dot { border-color: var(--or); }
+    .pr-radio-brand .pr-radio-dot { border-color: var(--teal); }
+    .pr-radio-row.active .pr-radio-dot { border-color: transparent; }
+    .pr-radio-row.active.pr-radio-publisher .pr-radio-dot { background: var(--or); }
+    .pr-radio-row.active.pr-radio-brand .pr-radio-dot { background: var(--teal); }
+    .pr-radio-row.active .pr-radio-dot::after {
+      content: "";
+      position: absolute;
+      width: 8px;
+      height: 5px;
+      border-left: 2px solid #121212;
+      border-bottom: 2px solid #121212;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -62%) rotate(-45deg);
+    }
+    .pr-radio-copy {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 1px;
+      text-align: left;
+    }
+    .pr-radio-title { font-size: 16px; font-weight: 500; color: rgba(255, 255, 255, 0.95); }
+    .pr-radio-sub { font-size: 13px; font-weight: 400; color: rgba(255, 255, 255, 0.46); }
+    .pr-left-foot {
+      margin-top: auto;
+      padding-top: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 14px;
+    }
+    .pr-left-link { color: rgba(255, 255, 255, 0.78); text-decoration: none; }
+    .pr-left-link:hover { color: #fff; }
+    .pr-left-email { text-decoration: underline; }
+    .pr-right {
+      background: var(--panel);
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      border-left: 1px solid rgba(255, 255, 255, 0.05);
+    }
+    .pr-right-inner {
+      padding: 44px 52px;
+      max-width: 540px;
+      width: 100%;
+      margin: 0 auto;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+    }
+    .pr-form-view { display: flex; flex-direction: column; flex: 1; }
+    .pr-form-h {
+      font-size: 30px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      margin-bottom: 5px;
+    }
+    .pr-form-sub2 {
+      font-size: 13px;
+      color: var(--text-2);
+      line-height: 1.6;
+      margin-bottom: 28px;
+    }
+    .pr-fr { margin-bottom: 14px; }
+    .pr-fr2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 11px;
+      margin-bottom: 14px;
+    }
+    .pr-lbl {
+      display: block;
+      font-size: 12px;
+      font-weight: 600;
+      color: rgba(255, 255, 255, 0.5);
+      margin-bottom: 6px;
+    }
+    .pr-hint {
+      font-size: 11px;
+      color: var(--text-3);
+      font-weight: 400;
+      margin-left: 3px;
+    }
+    .pr-fi {
+      width: 100%;
+      padding: 11px 13px;
+      font-size: 13px;
+      font-weight: 400;
+      color: var(--text-1);
+      background: var(--field);
+      border: 1px solid var(--border-f);
+      border-radius: 8px;
+      outline: none;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    .pr-fi::placeholder { color: rgba(255, 255, 255, 0.18); }
+    .pr-fi:focus {
+      border-color: rgba(232, 80, 26, 0.55);
+      box-shadow: 0 0 0 3px rgba(232, 80, 26, 0.1);
+    }
+    .partner-register-page.brand-mode .pr-fi:focus {
+      border-color: rgba(14, 165, 192, 0.55);
+      box-shadow: 0 0 0 3px rgba(14, 165, 192, 0.1);
+    }
+    textarea.pr-fi { resize: vertical; min-height: 82px; line-height: 1.6; }
+    .pr-btn-go {
+      width: 100%;
+      margin-top: 6px;
+      padding: 13px;
+      background: #e8501af2;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: background 0.15s, transform 0.12s, box-shadow 0.15s;
+    }
+    .pr-btn-go:disabled { opacity: 0.7; cursor: not-allowed; }
+    .partner-register-page.brand-mode .pr-btn-go { background: var(--teal); }
+    .pr-ty {
+      display: none;
+      flex-direction: column;
+      align-items: flex-start;
+      justify-content: center;
+      flex: 1;
+    }
+    .pr-ty.show { display: flex; }
+    .pr-ty-icon {
+      width: 54px;
+      height: 54px;
+      border-radius: 50%;
+      background: rgba(34, 197, 94, 0.1);
+      border: 1px solid rgba(34, 197, 94, 0.22);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 24px;
+    }
+    .pr-ty-icon svg {
+      width: 22px;
+      height: 22px;
+      stroke: #22c55e;
+      stroke-width: 2.5;
+      fill: none;
+    }
+    .pr-ty-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      background: rgba(232, 80, 26, 0.1);
+      border: 1px solid rgba(232, 80, 26, 0.22);
+      padding: 6px 14px;
+      border-radius: 999px;
+      font-size: 10px;
+      font-weight: 700;
+      color: var(--or);
+      margin-bottom: 22px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+    .pr-ty-pill-dot {
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: var(--or);
+    }
+    .pr-ty-h {
+      font-size: 46px;
+      font-weight: 800;
+      letter-spacing: -1px;
+      margin-bottom: 10px;
+      line-height: 1.1;
+    }
+    .pr-ty-p {
+      font-size: 14px;
+      font-weight: 300;
+      color: var(--text-2);
+      line-height: 1.72;
+      max-width: 380px;
+      margin-bottom: 28px;
+    }
+    .pr-btn-again {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-2);
+      border: 1px solid rgba(255, 255, 255, 0.13);
+      padding: 10px 18px;
+      border-radius: 8px;
+      background: none;
+      cursor: pointer;
+    }
+    .pr-alert {
+      display: none;
+      margin: 0 0 12px;
+      border-radius: 8px;
+      font-size: 13px;
+      padding: 10px 12px;
+    }
+    .pr-alert.show { display: block; }
+    .pr-alert.error {
+      background: rgba(239, 68, 68, 0.16);
+      border: 1px solid rgba(239, 68, 68, 0.35);
+      color: #fecaca;
+    }
+    .pr-alert.success {
+      background: rgba(34, 197, 94, 0.14);
+      border: 1px solid rgba(34, 197, 94, 0.35);
+      color: #bbf7d0;
+    }
+    @media (max-width: 1024px) {
+      .partner-register-page { grid-template-columns: 1fr; }
+      .pr-left { min-height: 300px; padding: 30px 22px 18px; }
+      .pr-left-foot { font-size: 12px; }
+      .pr-right-inner { padding: 32px 20px; }
+      .pr-fr2 { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div id="registerPage" class="partner-register-page">
+    <div class="pr-left">
+      <div class="pr-g-pub"></div>
+      <div class="pr-g-brand"></div>
+      <div class="pr-grain"></div>
+
+      <div class="pr-left-mid">
+        <button type="button" class="pr-logo pr-logo-center" id="homeBtn">
+          <img src="https://themarvelof.com/images/tmoe_logo_white.svg" alt="TMOE" class="pr-logo-img" />
+        </button>
+        <p class="pr-left-eyebrow">Technology Partnerships</p>
+        <h1 class="pr-left-title">Partner Registration.<br />Join the TMOE Network.</h1>
+        <p class="pr-left-sub">Create your partner profile to get started. Our team reviews every application and will be in touch shortly.</p>
+
+        <div class="pr-toggle-wrap">
+          <label class="pr-radio-row pr-radio-publisher active" id="publisherLabel">
+            <input type="radio" name="role" checked value="publisher" />
+            <span class="pr-radio-dot"></span>
+            <span class="pr-radio-copy">
+              <span class="pr-radio-title">Publisher</span>
+              <span class="pr-radio-sub">Monetize your audience.</span>
+            </span>
+          </label>
+          <label class="pr-radio-row pr-radio-brand" id="brandLabel">
+            <input type="radio" name="role" value="brand" />
+            <span class="pr-radio-dot"></span>
+            <span class="pr-radio-copy">
+              <span class="pr-radio-title">Brand</span>
+              <span class="pr-radio-sub">Scale content commerce.</span>
+            </span>
+          </label>
+        </div>
+      </div>
+
+      <div class="pr-left-foot">
+        <a class="pr-left-link" href="mailto:partner@marvelof.com">
+          Write to us at <span class="pr-left-email">Partner@marvelof.com</span>
+        </a>
+      </div>
+    </div>
+
+    <div class="pr-right">
+      <div class="pr-right-inner">
+        <div class="pr-form-view" id="formView">
+          <h2 class="pr-form-h" id="formHeading">Publisher Profile</h2>
+          <p class="pr-form-sub2">Fill in your details. Our team reviews every application personally.</p>
+          <div class="pr-alert error" id="errorAlert"></div>
+          <div class="pr-alert success" id="successAlert"></div>
+
+          <form id="registerForm">
+            <div class="pr-fr">
+              <label class="pr-lbl" for="email">Email *</label>
+              <input id="email" name="email" class="pr-fi" type="email" required placeholder="you@company.com" />
+            </div>
+
+            <div id="publisherFields">
+              <div class="pr-fr">
+                <label class="pr-lbl" for="name">Publisher Name *</label>
+                <input id="name" name="name" class="pr-fi" type="text" placeholder="e.g. The Indian Express" />
+              </div>
+              <div class="pr-fr">
+                <label class="pr-lbl" for="websitePublisher">Website URL *</label>
+                <input id="websitePublisher" name="websitePublisher" class="pr-fi" type="url" placeholder="https://yourpublication.com" />
+              </div>
+              <div class="pr-fr">
+                <label class="pr-lbl" for="categories">Content Categories <span class="pr-hint">comma-separated</span></label>
+                <input id="categories" name="categories" class="pr-fi" type="text" placeholder="Technology, Fashion, Lifestyle" />
+              </div>
+              <div class="pr-fr">
+                <label class="pr-lbl" for="descriptionPublisher">Description *</label>
+                <textarea id="descriptionPublisher" name="descriptionPublisher" class="pr-fi" required rows="4" placeholder="Tell us about your publication - audience, reach, editorial focus..."></textarea>
+              </div>
+              <div class="pr-fr2">
+                <div>
+                  <label class="pr-lbl" for="monthly_sessions">Monthly Sessions</label>
+                  <input id="monthly_sessions" name="monthly_sessions" class="pr-fi" type="number" min="0" value="0" placeholder="0" />
+                </div>
+                <div>
+                  <label class="pr-lbl" for="monthly_pageviews">Monthly Pageviews</label>
+                  <input id="monthly_pageviews" name="monthly_pageviews" class="pr-fi" type="number" min="0" value="0" placeholder="0" />
+                </div>
+              </div>
+            </div>
+
+            <div id="brandFields" style="display:none;">
+              <div class="pr-fr">
+                <label class="pr-lbl" for="company_name">Company Name *</label>
+                <input id="company_name" name="company_name" class="pr-fi" type="text" placeholder="e.g. Acme Commerce Ltd." />
+              </div>
+              <div class="pr-fr">
+                <label class="pr-lbl" for="websiteBrand">Website URL *</label>
+                <input id="websiteBrand" name="websiteBrand" class="pr-fi" type="url" placeholder="https://yourbrand.com" />
+              </div>
+              <div class="pr-fr">
+                <label class="pr-lbl" for="industry">Industry *</label>
+                <input id="industry" name="industry" class="pr-fi" type="text" placeholder="e.g. Fashion, Electronics, Beauty" />
+              </div>
+              <div class="pr-fr">
+                <label class="pr-lbl" for="descriptionBrand">Description *</label>
+                <textarea id="descriptionBrand" name="descriptionBrand" class="pr-fi" rows="4" placeholder="Tell us about your brand - products, markets, goals..."></textarea>
+              </div>
+              <div class="pr-fr">
+                <label class="pr-lbl" for="target_categories">Target Categories <span class="pr-hint">comma-separated</span></label>
+                <input id="target_categories" name="target_categories" class="pr-fi" type="text" placeholder="Technology, Fashion, Lifestyle" />
+              </div>
+              <div class="pr-fr">
+                <label class="pr-lbl" for="target_markets">Target Markets <span class="pr-hint">comma-separated</span></label>
+                <input id="target_markets" name="target_markets" class="pr-fi" type="text" placeholder="India, UAE, Indonesia" />
+              </div>
+              <div class="pr-fr">
+                <label class="pr-lbl" for="commerce_links">Commerce Links <span class="pr-hint">comma-separated</span></label>
+                <input id="commerce_links" name="commerce_links" class="pr-fi" type="text" placeholder="https://shop.example.com, https://amazon.com/brand" />
+              </div>
+            </div>
+
+            <button class="pr-btn-go" id="submitBtn" type="submit">
+              <span id="submitText">Create Publisher Profile</span>
+              <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                <path d="M5 12h14m-7-7 7 7-7 7"></path>
+              </svg>
+            </button>
+          </form>
+        </div>
+
+        <div class="pr-ty" id="thankYouView">
+          <div class="pr-ty-icon">
+            <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg>
+          </div>
+          <div class="pr-ty-pill"><span class="pr-ty-pill-dot"></span>Application received</div>
+          <h2 class="pr-ty-h">Thank you for registering.</h2>
+          <p class="pr-ty-p">We'll let you know once our platform is live and your profile has been reviewed.</p>
+          <button type="button" class="pr-btn-again" id="registerAgainBtn">
+            <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M19 12H5m7-7-7 7 7 7"></path></svg>
+            Register another profile
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Update this for the domain where your backend API is hosted.
+    // Example: const BACKEND_URL = "https://api.yourdomain.com";
+    const BACKEND_URL = "https://tmoe-c2c-platform.onrender.com";
+    const REGISTER_ENDPOINT = BACKEND_URL.replace(/\/+$/, "") + "/api/auth/register";
+
+    const state = {
+      role: "publisher",
+      loading: false
+    };
+
+    const registerPage = document.getElementById("registerPage");
+    const publisherLabel = document.getElementById("publisherLabel");
+    const brandLabel = document.getElementById("brandLabel");
+    const publisherFields = document.getElementById("publisherFields");
+    const brandFields = document.getElementById("brandFields");
+    const formHeading = document.getElementById("formHeading");
+    const submitText = document.getElementById("submitText");
+    const submitBtn = document.getElementById("submitBtn");
+    const registerForm = document.getElementById("registerForm");
+    const formView = document.getElementById("formView");
+    const thankYouView = document.getElementById("thankYouView");
+    const registerAgainBtn = document.getElementById("registerAgainBtn");
+    const errorAlert = document.getElementById("errorAlert");
+    const successAlert = document.getElementById("successAlert");
+    const homeBtn = document.getElementById("homeBtn");
+
+    function toArray(value) {
+      return (value || "")
+        .split(",")
+        .map(function(item) { return item.trim(); })
+        .filter(Boolean);
+    }
+
+    function hideAlerts() {
+      errorAlert.classList.remove("show");
+      successAlert.classList.remove("show");
+      errorAlert.textContent = "";
+      successAlert.textContent = "";
+    }
+
+    function showError(message) {
+      errorAlert.textContent = message || "Registration failed";
+      errorAlert.classList.add("show");
+    }
+
+    function setLoading(loading) {
+      state.loading = loading;
+      submitBtn.disabled = loading;
+      submitText.textContent = loading
+        ? "Submitting..."
+        : (state.role === "publisher" ? "Create Publisher Profile" : "Create Brand Profile");
+    }
+
+    function setRequiredByRole() {
+      const publisherRequired = state.role === "publisher";
+      const brandRequired = state.role === "brand";
+
+      document.getElementById("name").required = publisherRequired;
+      document.getElementById("websitePublisher").required = publisherRequired;
+      document.getElementById("descriptionPublisher").required = publisherRequired;
+
+      document.getElementById("company_name").required = brandRequired;
+      document.getElementById("websiteBrand").required = brandRequired;
+      document.getElementById("industry").required = brandRequired;
+      document.getElementById("descriptionBrand").required = brandRequired;
+    }
+
+    function switchRole(role) {
+      if (state.loading || state.role === role) return;
+      state.role = role;
+      hideAlerts();
+
+      const isBrand = role === "brand";
+      registerPage.classList.toggle("brand-mode", isBrand);
+      publisherLabel.classList.toggle("active", !isBrand);
+      brandLabel.classList.toggle("active", isBrand);
+      publisherFields.style.display = isBrand ? "none" : "block";
+      brandFields.style.display = isBrand ? "block" : "none";
+      formHeading.textContent = isBrand ? "Brand Profile" : "Publisher Profile";
+      submitText.textContent = isBrand ? "Create Brand Profile" : "Create Publisher Profile";
+
+      setRequiredByRole();
+    }
+
+    function resetForm() {
+      registerForm.reset();
+      document.getElementById("monthly_sessions").value = "0";
+      document.getElementById("monthly_pageviews").value = "0";
+      hideAlerts();
+      formView.style.display = "flex";
+      thankYouView.classList.remove("show");
+      setLoading(false);
+      setRequiredByRole();
+    }
+
+    async function submitRegistration(event) {
+      event.preventDefault();
+      if (state.loading) return;
+      hideAlerts();
+      setLoading(true);
+
+      try {
+        const email = document.getElementById("email").value.trim();
+        const payload = {
+          email: email,
+          role: state.role,
+          website: state.role === "publisher"
+            ? document.getElementById("websitePublisher").value.trim()
+            : document.getElementById("websiteBrand").value.trim()
+        };
+
+        if (state.role === "brand") {
+          payload.company_name = document.getElementById("company_name").value.trim();
+          payload.industry = document.getElementById("industry").value.trim();
+          payload.description = document.getElementById("descriptionBrand").value.trim();
+          payload.target_categories = toArray(document.getElementById("target_categories").value);
+          payload.target_markets = toArray(document.getElementById("target_markets").value);
+          payload.commerce_links = toArray(document.getElementById("commerce_links").value);
+        } else {
+          payload.name = document.getElementById("name").value.trim();
+          payload.description = document.getElementById("descriptionPublisher").value.trim();
+          payload.categories = toArray(document.getElementById("categories").value);
+          payload.monthly_sessions = parseInt(document.getElementById("monthly_sessions").value, 10) || 0;
+          payload.monthly_pageviews = parseInt(document.getElementById("monthly_pageviews").value, 10) || 0;
+        }
+
+        const response = await fetch(REGISTER_ENDPOINT, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+
+        if (!response.ok) {
+          let message = "Registration failed";
+          try {
+            const errorData = await response.json();
+            if (errorData && errorData.detail) message = errorData.detail;
+          } catch (_) {
+            // fallback to generic message
+          }
+          throw new Error(message);
+        }
+
+        formView.style.display = "none";
+        thankYouView.classList.add("show");
+      } catch (error) {
+        showError(error.message || "Registration failed");
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    homeBtn.addEventListener("click", function() {
+      window.location.href = "https://themarvelof.com";
+    });
+    publisherLabel.addEventListener("click", function() { switchRole("publisher"); });
+    brandLabel.addEventListener("click", function() { switchRole("brand"); });
+    registerAgainBtn.addEventListener("click", resetForm);
+    registerForm.addEventListener("submit", submitRegistration);
+
+    switchRole("publisher");
+  </script>
+</body>
+</html>
