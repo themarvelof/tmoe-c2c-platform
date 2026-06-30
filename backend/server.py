@@ -16,7 +16,7 @@ import requests
 from pathlib import Path
 from functools import lru_cache
 from pydantic import BaseModel, Field, ConfigDict, EmailStr
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Literal
 import uuid
 from datetime import datetime, timezone, timedelta
 import jwt
@@ -393,6 +393,25 @@ class ContentPieceCreate(BaseModel):
     author: Optional[str] = None
     source: str = "rss"
 
+class ContactInquiryCreate(BaseModel):
+    first_name: str = Field(min_length=1, max_length=100)
+    email: EmailStr
+    company_name: str = Field(min_length=1, max_length=200)
+    company_type: Literal["publisher", "brand_advertiser", "both", "other"]
+    message: str = Field(min_length=1, max_length=5000)
+    marketing_consent: bool = False
+
+class ContactInquiry(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    first_name: str
+    email: EmailStr
+    company_name: str
+    company_type: str
+    message: str
+    marketing_consent: bool = False
+    created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+
 # ==================== HELPER FUNCTIONS ====================
 
 def create_access_token(data: dict):
@@ -525,6 +544,12 @@ def send_registration_email(recipient_email: str, role: str) -> bool:
     )
     template_name = "registration_brand.html" if is_brand else "registration_publisher.html"
     html_content = _load_registration_email_template(template_name)
+    return send_email(recipient_email, subject, html_content)
+
+def send_contact_inquiry_email(recipient_email: str, first_name: str) -> bool:
+    subject = "We received your message — TMOE Group"
+    html_content = _load_registration_email_template("contact_inquiry_confirmation.html")
+    html_content = html_content.replace("{{first_name}}", first_name.strip())
     return send_email(recipient_email, subject, html_content)
 
 SEED_ACCOUNT_PASSWORDS = {
@@ -2200,6 +2225,29 @@ async def get_brands_list(current_user: UserResponse = Depends(require_role([Use
         })
     return result
 
+# ==================== CONTACT INQUIRY ROUTES ====================
+
+@api_router.post("/contact-inquiries")
+async def submit_contact_inquiry(inquiry_data: ContactInquiryCreate):
+    """
+    Public endpoint for themarvelof.com contact form submissions.
+    Stores the inquiry and sends a confirmation email to the submitter.
+    """
+    inquiry = ContactInquiry(
+        first_name=inquiry_data.first_name.strip(),
+        email=inquiry_data.email,
+        company_name=inquiry_data.company_name.strip(),
+        company_type=inquiry_data.company_type,
+        message=inquiry_data.message.strip(),
+        marketing_consent=inquiry_data.marketing_consent,
+    )
+    await db.contact_inquiries.insert_one(inquiry.model_dump())
+    send_contact_inquiry_email(str(inquiry_data.email), inquiry.first_name)
+    return {
+        "message": "Thank you for reaching out. We'll be in touch shortly.",
+        "inquiry_id": inquiry.id,
+    }
+
 # ==================== SEED DATA ROUTE ====================
 
 @api_router.post("/seed-admin")
@@ -2524,6 +2572,9 @@ async def startup_seed():
                 sample_reports.append(report.model_dump())
             await db.brand_reports.insert_many(sample_reports)
             logger.info(f"Seeded {len(sample_reports)} sample reports for Amazon TMOE")
+
+        await db.contact_inquiries.create_index("email")
+        await db.contact_inquiries.create_index("created_at")
 
         logger.info("Startup seed complete")
     except Exception as e:
